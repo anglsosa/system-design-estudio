@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>System Design desde la Raíz</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--bg: #FAF8F5; --surface: #FFFFFF; --text: #141413; --muted: #78756E; --border: #E6E2DA;
+			--accent: #1D4ED8; --accent-soft: #EFF6FF; --pending: #F2EFE9;
+		}
+		@media (prefers-color-scheme: dark) {
+			:root:not([data-theme="light"]) {
+				--bg: #0D0F12; --surface: #181C22; --text: #ECEAE4; --muted: #7E7B72; --border: #262B35;
+				--accent: #60A5FA; --accent-soft: rgba(59,130,246,0.12); --pending: #14171C;
+			}
+		}
+		* { box-sizing: border-box; margin: 0; padding: 0; }
+		body { background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; line-height: 1.6; }
+		main { max-width: 760px; margin: 0 auto; padding: 2.5rem 16px 4rem; }
+		.kicker { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+		h1 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: clamp(2.2rem, 7vw, 3.2rem); line-height: 1.1; margin: 0.6rem 0 0.8rem; }
+		.lead { color: var(--muted); margin-bottom: 2rem; }
+		.card { display: block; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.3rem; margin-bottom: 0.9rem; transition: border-color 0.15s ease, transform 0.15s ease; }
+		a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
+		.badge { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: 0.15rem 0.5rem; border-radius: 5px; }
+		.card h2 { font-size: 1.15rem; margin: 0.5rem 0 0.25rem; }
+		.card p { font-size: 0.9rem; color: var(--muted); }
+		.card.pending { background: var(--pending); border-style: dashed; }
+		.card.pending .badge { color: var(--muted); background: transparent; border: 1px solid var(--border); }
+	</style>
+</head>
+<body>
+	<main>
+		<span class="kicker">Arquitectura de Sistemas · Manual progresivo</span>
+		<h1>System Design desde la Raíz</h1>
+		<p class="lead">Guías interactivas con diagramas animados y laboratorios. Cada fase construye sobre la anterior.</p>
+
+		<a class="card" href="arquitectura_sistemas_fundamentos.html">
+			<span class="badge">FASE 1 · 5 temas</span>
+			<h2>Fundamentos</h2>
+			<p>Requisitos y trade-offs, cómo viaja una petición, APIs, estimaciones de capacidad, disponibilidad y percentiles.</p>
+		</a>
+		<a class="card" href="arquitectura_sistemas_datos_almacenamiento.html">
+			<span class="badge">FASE 2 · 5 temas</span>
+			<h2>Datos y Almacenamiento</h2>
+			<p>SQL y ACID, índices B-Tree, NoSQL y CAP, IDs únicos (UUID, Snowflake, Base62), transacciones y MVCC.</p>
+		</a>
+		<div class="card pending">
+			<span class="badge">FASE 3 · próximamente</span>
+			<h2>Rendimiento</h2>
+			<p>Caché, CDN y fallos de caché en producción.</p>
+		</div>
+	</main>
+</body>
+</html>
