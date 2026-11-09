@@ -1,0 +1,3153 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light" data-font="sans">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Arquitectura de Sistemas — Fase 6: Comunicación Asíncrona (Pasos 6.1 a 6.3)</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--bg-primary: #FAF8F5;
+			--bg-secondary: #F2EFE9;
+			--bg-surface: #FFFFFF;
+			--bg-elevated: #F7F5F0;
+			--bg-code: #16181D;
+			--text-primary: #141413;
+			--text-secondary: #4A4843;
+			--text-muted: #78756E;
+			--border-subtle: #E6E2DA;
+			--border-strong: #CDC7BC;
+			--accent-primary: #1D4ED8;
+			--accent-primary-soft: #EFF6FF;
+			--accent-primary-border: #BFDBFE;
+			--accent-memory: #6D28D9;
+			--accent-memory-soft: #F5F3FF;
+			--accent-memory-border: #DDD6FE;
+			--accent-pro: #047857;
+			--accent-pro-soft: #ECFDF5;
+			--accent-pro-border: #A7F3D0;
+			--accent-warn: #B45309;
+			--accent-warn-soft: #FFFBEB;
+			--accent-warn-border: #FDE68A;
+			--accent-danger: #BE123C;
+			--accent-danger-soft: #FFF1F2;
+			--accent-danger-border: #FECDD3;
+			--shadow-sm: 0 1px 3px rgba(20, 20, 19, 0.05);
+			--shadow-md: 0 8px 24px -4px rgba(20, 20, 19, 0.07);
+			--font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+			--font-serif: 'Lora', Georgia, serif;
+			--font-display: 'Instrument Serif', Georgia, serif;
+			--font-mono: 'JetBrains Mono', monospace;
+			--body-font: var(--font-sans);
+			--base-size: 17px;
+			--line-height: 1.78;
+			--sidebar-width: 310px;
+		}
+
+		html[data-theme="dark"] {
+			--bg-primary: #0D0F12;
+			--bg-secondary: #14171C;
+			--bg-surface: #181C22;
+			--bg-elevated: #1E232B;
+			--bg-code: #090B0E;
+			--text-primary: #ECEAE4;
+			--text-secondary: #B5B2A8;
+			--text-muted: #7E7B72;
+			--border-subtle: #262B35;
+			--border-strong: #38404E;
+			--accent-primary: #60A5FA;
+			--accent-primary-soft: rgba(59, 130, 246, 0.12);
+			--accent-primary-border: rgba(96, 165, 250, 0.3);
+			--accent-memory: #C084FC;
+			--accent-memory-soft: rgba(168, 85, 247, 0.12);
+			--accent-memory-border: rgba(192, 132, 252, 0.3);
+			--accent-pro: #34D399;
+			--accent-pro-soft: rgba(16, 185, 129, 0.12);
+			--accent-pro-border: rgba(52, 211, 153, 0.3);
+			--accent-warn: #FBBF24;
+			--accent-warn-soft: rgba(245, 158, 11, 0.12);
+			--accent-warn-border: rgba(251, 191, 36, 0.3);
+			--accent-danger: #FB7185;
+			--accent-danger-soft: rgba(244, 63, 94, 0.12);
+			--accent-danger-border: rgba(251, 113, 133, 0.3);
+			--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+			--shadow-md: 0 10px 30px -5px rgba(0, 0, 0, 0.45);
+		}
+
+		html[data-font="serif"] {
+			--body-font: var(--font-serif);
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		html {
+			scroll-behavior: smooth;
+			font-size: var(--base-size);
+			tab-size: 4;
+		}
+
+		body {
+			background-color: var(--bg-primary);
+			color: var(--text-primary);
+			font-family: var(--body-font);
+			line-height: var(--line-height);
+			-webkit-font-smoothing: antialiased;
+			transition: background-color 0.25s ease, color 0.25s ease;
+		}
+
+		/* Top Progress Bar */
+		.reading-progress-bar {
+			position: fixed;
+			top: 0;
+			left: 0;
+			height: 3px;
+			background: linear-gradient(90deg, var(--accent-primary), var(--accent-memory), var(--accent-pro));
+			width: 0%;
+			z-index: 1000;
+			transition: width 0.1s ease;
+		}
+
+		/* Layout Shell */
+		.app-shell {
+			display: grid;
+			grid-template-columns: var(--sidebar-width) 1fr;
+			min-height: 100vh;
+			transition: grid-template-columns 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+		}
+
+		.app-shell.sidebar-collapsed {
+			grid-template-columns: 0px 1fr;
+		}
+
+		/* Minimalist Inline Vector Icons */
+		.ui-icon {
+			width: 15px;
+			height: 15px;
+			stroke: currentColor;
+			stroke-width: 1.85;
+			stroke-linecap: round;
+			stroke-linejoin: round;
+			fill: none;
+			flex-shrink: 0;
+			display: inline-block;
+			vertical-align: -0.18em;
+		}
+
+		/* Sidebar */
+		.sidebar {
+			position: sticky;
+			top: 0;
+			height: 100vh;
+			width: var(--sidebar-width);
+			overflow-y: auto;
+			overflow-x: hidden;
+			background-color: var(--bg-secondary);
+			border-right: 1px solid var(--border-subtle);
+			padding: 1.5rem 1.15rem;
+			display: flex;
+			flex-direction: column;
+			gap: 1.25rem;
+			z-index: 100;
+			transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1), padding 0.28s ease, opacity 0.2s ease, border-color 0.2s ease;
+		}
+
+		.app-shell.sidebar-collapsed .sidebar {
+			width: 0;
+			min-width: 0;
+			padding-left: 0;
+			padding-right: 0;
+			border-right-color: transparent;
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		.brand-header {
+			padding-bottom: 1rem;
+			border-bottom: 1px solid var(--border-subtle);
+		}
+
+		.brand-top-row {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.5rem;
+			margin-bottom: 0.3rem;
+		}
+
+		.brand-eyebrow {
+			font-family: var(--font-mono);
+			font-size: 0.68rem;
+			text-transform: uppercase;
+			letter-spacing: 0.1em;
+			color: var(--accent-primary);
+			font-weight: 600;
+			display: block;
+		}
+
+		.sidebar-toggle-btn {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.3rem;
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			color: var(--text-secondary);
+			font-family: var(--font-sans);
+			font-size: 0.68rem;
+			font-weight: 600;
+			padding: 0.22rem 0.5rem;
+			border-radius: 6px;
+			cursor: pointer;
+			transition: all 0.15s ease;
+		}
+
+		.sidebar-toggle-btn:hover {
+			border-color: var(--border-strong);
+			color: var(--text-primary);
+			background: var(--bg-elevated);
+		}
+
+		.sidebar-expand-fab {
+			position: fixed;
+			top: 1.1rem;
+			left: 1.1rem;
+			z-index: 950;
+			display: inline-flex;
+			align-items: center;
+			gap: 0.45rem;
+			background: var(--bg-surface);
+			border: 1px solid var(--border-strong);
+			color: var(--text-primary);
+			font-family: var(--font-sans);
+			font-size: 0.76rem;
+			font-weight: 600;
+			padding: 0.42rem 0.75rem;
+			border-radius: 8px;
+			box-shadow: var(--shadow-md);
+			cursor: pointer;
+			opacity: 0;
+			pointer-events: none;
+			transform: translateX(-8px);
+			transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.15s ease;
+		}
+
+		.sidebar-expand-fab:hover {
+			border-color: var(--accent-primary);
+			color: var(--accent-primary);
+		}
+
+		.app-shell.sidebar-collapsed + .sidebar-expand-fab,
+		body.sidebar-is-collapsed .sidebar-expand-fab {
+			opacity: 1;
+			pointer-events: auto;
+			transform: translateX(0);
+		}
+
+		.brand-title {
+			font-family: var(--font-sans);
+			font-size: 1.05rem;
+			font-weight: 700;
+			letter-spacing: -0.02em;
+			color: var(--text-primary);
+			line-height: 1.3;
+		}
+
+		.brand-subtitle {
+			font-size: 0.76rem;
+			color: var(--text-muted);
+			margin-top: 0.25rem;
+			line-height: 1.4;
+		}
+
+		/* Controls in Sidebar */
+		.reader-controls {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			border-radius: 10px;
+			padding: 0.7rem;
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+			box-shadow: var(--shadow-sm);
+		}
+
+		.control-row {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.4rem;
+		}
+
+		.control-label {
+			font-family: var(--font-sans);
+			font-size: 0.7rem;
+			font-weight: 600;
+			color: var(--text-muted);
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+
+		.btn-group {
+			display: flex;
+			gap: 0.25rem;
+		}
+
+		.ctrl-btn {
+			background: var(--bg-elevated);
+			border: 1px solid var(--border-subtle);
+			color: var(--text-secondary);
+			font-family: var(--font-sans);
+			font-size: 0.72rem;
+			font-weight: 600;
+			padding: 0.25rem 0.55rem;
+			border-radius: 6px;
+			cursor: pointer;
+			transition: all 0.15s ease;
+		}
+
+		.ctrl-btn:hover {
+			border-color: var(--border-strong);
+			color: var(--text-primary);
+		}
+
+		.ctrl-btn.active {
+			background: var(--accent-primary);
+			color: #FFFFFF;
+			border-color: var(--accent-primary);
+		}
+
+		/* Navigation List */
+		.nav-section-title {
+			font-family: var(--font-mono);
+			font-size: 0.68rem;
+			text-transform: uppercase;
+			letter-spacing: 0.08em;
+			color: var(--text-muted);
+			margin-bottom: 0.5rem;
+			padding-left: 0.3rem;
+		}
+
+		.nav-list {
+			list-style: none;
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+		}
+
+		.nav-item a {
+			display: flex;
+			align-items: flex-start;
+			gap: 0.6rem;
+			padding: 0.55rem 0.65rem;
+			border-radius: 8px;
+			text-decoration: none;
+			color: var(--text-secondary);
+			font-family: var(--font-sans);
+			font-size: 0.82rem;
+			font-weight: 500;
+			line-height: 1.35;
+			transition: all 0.15s ease;
+			border: 1px solid transparent;
+		}
+
+		.nav-item a:hover {
+			background: var(--bg-surface);
+			color: var(--text-primary);
+			border-color: var(--border-subtle);
+		}
+
+		.nav-item a.active {
+			background: var(--accent-primary-soft);
+			color: var(--accent-primary);
+			border-color: var(--accent-primary-border);
+			font-weight: 600;
+		}
+
+		.step-badge {
+			font-family: var(--font-mono);
+			font-size: 0.68rem;
+			font-weight: 600;
+			padding: 0.1rem 0.38rem;
+			border-radius: 4px;
+			background: var(--bg-elevated);
+			color: var(--text-muted);
+			flex-shrink: 0;
+			margin-top: 0.05rem;
+		}
+
+		.nav-item a.active .step-badge {
+			background: var(--accent-primary);
+			color: #FFFFFF;
+		}
+
+		.roadmap-future-list {
+			list-style: none;
+			display: flex;
+			flex-direction: column;
+			gap: 0.25rem;
+			font-family: var(--font-sans);
+			font-size: 0.75rem;
+			color: var(--text-muted);
+			padding-left: 0.3rem;
+		}
+
+		.roadmap-future-list li {
+			padding: 0.25rem 0.4rem;
+			border-left: 2px solid var(--border-subtle);
+			display: flex;
+			justify-content: space-between;
+		}
+
+		/* Main Content Area */
+		.main-content {
+			max-width: 920px;
+			width: 100%;
+			margin: 0 auto;
+			padding: 3rem 2.5rem 6rem;
+		}
+
+		/* Hero Banner */
+		.hero-header {
+			border-bottom: 2px solid var(--text-primary);
+			padding-bottom: 2.2rem;
+			margin-bottom: 3rem;
+		}
+
+		.hero-kicker {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.5rem;
+			font-family: var(--font-mono);
+			font-size: 0.75rem;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.08em;
+			color: var(--accent-primary);
+			background: var(--accent-primary-soft);
+			border: 1px solid var(--accent-primary-border);
+			padding: 0.3rem 0.75rem;
+			border-radius: 999px;
+			margin-bottom: 1rem;
+		}
+
+		.hero-title {
+			font-family: var(--font-display);
+			font-size: 3.1rem;
+			font-weight: 400;
+			line-height: 1.1;
+			letter-spacing: -0.01em;
+			margin-bottom: 1rem;
+			color: var(--text-primary);
+		}
+
+		.hero-lead {
+			font-size: 1.08rem;
+			color: var(--text-secondary);
+			max-width: 760px;
+			margin-bottom: 1.5rem;
+		}
+
+		/* Progressive Chain Visual Map */
+		.progressive-chain-card {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			border-radius: 14px;
+			padding: 1.4rem 1.5rem;
+			margin-bottom: 3rem;
+			box-shadow: var(--shadow-sm);
+		}
+
+		.chain-title {
+			font-family: var(--font-sans);
+			font-size: 0.85rem;
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+			color: var(--text-muted);
+			margin-bottom: 1rem;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.chain-steps {
+			display: grid;
+			grid-template-columns: repeat(5, 1fr);
+			gap: 0.6rem;
+		}
+
+		.chain-node {
+			background: var(--bg-elevated);
+			border: 1px solid var(--border-subtle);
+			border-radius: 10px;
+			padding: 0.75rem;
+			text-decoration: none;
+			color: var(--text-primary);
+			transition: all 0.2s ease;
+			position: relative;
+		}
+
+		.chain-node:hover {
+			border-color: var(--accent-primary);
+			transform: translateY(-2px);
+			box-shadow: var(--shadow-sm);
+		}
+
+		.chain-node-num {
+			font-family: var(--font-mono);
+			font-size: 0.7rem;
+			font-weight: 700;
+			color: var(--accent-primary);
+			display: block;
+			margin-bottom: 0.2rem;
+		}
+
+		.chain-node-name {
+			font-family: var(--font-sans);
+			font-size: 0.8rem;
+			font-weight: 700;
+			line-height: 1.25;
+			margin-bottom: 0.35rem;
+			display: block;
+		}
+
+		.chain-node-desc {
+			font-family: var(--font-sans);
+			font-size: 0.7rem;
+			color: var(--text-muted);
+			line-height: 1.35;
+			display: block;
+		}
+
+		/* Topic Chapter Container */
+		.topic-chapter {
+			padding-top: 2.5rem;
+			margin-bottom: 5.5rem;
+			border-top: 2px solid var(--border-strong);
+		}
+
+		.chapter-meta {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 0.6rem;
+			margin-bottom: 0.75rem;
+		}
+
+		.chapter-badge {
+			font-family: var(--font-mono);
+			font-size: 0.76rem;
+			font-weight: 700;
+			background: var(--text-primary);
+			color: var(--bg-primary);
+			padding: 0.25rem 0.65rem;
+			border-radius: 6px;
+		}
+
+		.chapter-tag {
+			font-family: var(--font-mono);
+			font-size: 0.72rem;
+			color: var(--text-muted);
+			background: var(--bg-secondary);
+			padding: 0.22rem 0.6rem;
+			border-radius: 6px;
+			border: 1px solid var(--border-subtle);
+		}
+
+		.chapter-title {
+			font-family: var(--font-display);
+			font-size: 2.55rem;
+			font-weight: 400;
+			line-height: 1.15;
+			color: var(--text-primary);
+			margin-bottom: 1rem;
+		}
+
+		.chapter-subtitle {
+			font-size: 1.08rem;
+			color: var(--text-secondary);
+			margin-bottom: 1.75rem;
+			font-weight: 400;
+		}
+
+		/* Dependency / Memory Anchor Box ("De dónde venimos y qué recordamos") */
+		.memory-bridge {
+			background: var(--accent-memory-soft);
+			border: 1px solid var(--accent-memory-border);
+			border-left: 4px solid var(--accent-memory);
+			border-radius: 10px;
+			padding: 1.15rem 1.35rem;
+			margin: 1.5rem 0 2rem;
+		}
+
+		.memory-bridge-header {
+			font-family: var(--font-sans);
+			font-size: 0.8rem;
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+			color: var(--accent-memory);
+			margin-bottom: 0.5rem;
+			display: flex;
+			align-items: center;
+			gap: 0.45rem;
+		}
+
+		.memory-bridge p {
+			font-size: 0.94rem;
+			color: var(--text-primary);
+			margin-bottom: 0.5rem;
+		}
+
+		.memory-bridge p:last-child {
+			margin-bottom: 0;
+		}
+
+		.memory-pill {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.25rem;
+			font-family: var(--font-mono);
+			font-size: 0.75rem;
+			font-weight: 600;
+			color: var(--accent-memory);
+			background: var(--bg-surface);
+			border: 1px solid var(--accent-memory-border);
+			padding: 0.1rem 0.5rem;
+			border-radius: 5px;
+			text-decoration: none;
+			transition: all 0.15s ease;
+		}
+
+		.memory-pill:hover {
+			background: var(--accent-memory);
+			color: #FFFFFF;
+		}
+
+		/* Typography inside chapters */
+		h3.section-heading {
+			font-family: var(--font-sans);
+			font-size: 1.38rem;
+			font-weight: 700;
+			letter-spacing: -0.02em;
+			color: var(--text-primary);
+			margin: 2.6rem 0 1rem;
+			display: flex;
+			align-items: center;
+			gap: 0.6rem;
+		}
+
+		h3.section-heading .sec-num {
+			font-family: var(--font-mono);
+			font-size: 0.82rem;
+			color: var(--accent-primary);
+			background: var(--accent-primary-soft);
+			border: 1px solid var(--accent-primary-border);
+			padding: 0.15rem 0.5rem;
+			border-radius: 6px;
+		}
+
+		h4.subsection-heading {
+			font-family: var(--font-sans);
+			font-size: 1.08rem;
+			font-weight: 700;
+			color: var(--text-primary);
+			margin: 1.8rem 0 0.75rem;
+		}
+
+		p {
+			margin-bottom: 1.15rem;
+			color: var(--text-primary);
+		}
+
+		ul, ol {
+			margin: 0.75rem 0 1.35rem 1.5rem;
+		}
+
+		li {
+			margin-bottom: 0.5rem;
+		}
+
+		li strong {
+			color: var(--text-primary);
+		}
+
+		code {
+			font-family: var(--font-mono);
+			font-size: 0.84em;
+			background: var(--bg-secondary);
+			border: 1px solid var(--border-subtle);
+			padding: 0.12rem 0.4rem;
+			border-radius: 5px;
+			color: var(--text-primary);
+		}
+
+		pre {
+			background: var(--bg-code);
+			color: #E5E7EB;
+			font-family: var(--font-mono);
+			font-size: 0.82rem;
+			line-height: 1.65;
+			padding: 1.25rem 1.4rem;
+			border-radius: 10px;
+			overflow-x: auto;
+			margin: 1.25rem 0 1.6rem;
+			border: 1px solid var(--border-strong);
+			tab-size: 4;
+		}
+
+		pre code {
+			background: none;
+			border: none;
+			padding: 0;
+			color: inherit;
+			font-size: inherit;
+		}
+
+		/* Callout Boxes */
+		.callout {
+			border-radius: 10px;
+			padding: 1.15rem 1.35rem;
+			margin: 1.4rem 0;
+			border: 1px solid var(--border-subtle);
+			background: var(--bg-surface);
+		}
+
+		.callout-title {
+			font-family: var(--font-sans);
+			font-size: 0.82rem;
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			margin-bottom: 0.45rem;
+			display: flex;
+			align-items: center;
+			gap: 0.45rem;
+		}
+
+		.callout.analogy {
+			background: var(--accent-primary-soft);
+			border-color: var(--accent-primary-border);
+			border-left: 4px solid var(--accent-primary);
+		}
+		.callout.analogy .callout-title { color: var(--accent-primary); }
+
+		.callout.tradeoff {
+			background: var(--accent-warn-soft);
+			border-color: var(--accent-warn-border);
+			border-left: 4px solid var(--accent-warn);
+		}
+		.callout.tradeoff .callout-title { color: var(--accent-warn); }
+
+		.callout.pro-tip {
+			background: var(--accent-pro-soft);
+			border-color: var(--accent-pro-border);
+			border-left: 4px solid var(--accent-pro);
+		}
+		.callout.pro-tip .callout-title { color: var(--accent-pro); }
+
+		.callout.danger {
+			background: var(--accent-danger-soft);
+			border-color: var(--accent-danger-border);
+			border-left: 4px solid var(--accent-danger);
+		}
+		.callout.danger .callout-title { color: var(--accent-danger); }
+
+		/* Formula Display Block */
+		.formula-box {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-strong);
+			border-radius: 10px;
+			padding: 1.1rem 1.4rem;
+			margin: 1.25rem 0;
+			text-align: center;
+			font-family: var(--font-mono);
+			font-size: 0.96rem;
+			font-weight: 600;
+			color: var(--text-primary);
+			box-shadow: var(--shadow-sm);
+		}
+
+		.formula-box .formula-caption {
+			display: block;
+			font-family: var(--font-sans);
+			font-size: 0.78rem;
+			font-weight: 500;
+			color: var(--text-muted);
+			margin-top: 0.4rem;
+		}
+
+		/* Tables */
+		.table-wrapper {
+			overflow-x: auto;
+			margin: 1.35rem 0 1.75rem;
+			border: 1px solid var(--border-subtle);
+			border-radius: 10px;
+			background: var(--bg-surface);
+			box-shadow: var(--shadow-sm);
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-family: var(--font-sans);
+			font-size: 0.86rem;
+			line-height: 1.5;
+		}
+
+		th {
+			background: var(--bg-secondary);
+			color: var(--text-primary);
+			font-weight: 700;
+			text-align: left;
+			padding: 0.8rem 1rem;
+			border-bottom: 1px solid var(--border-strong);
+		}
+
+		td {
+			padding: 0.8rem 1rem;
+			border-bottom: 1px solid var(--border-subtle);
+			color: var(--text-secondary);
+			vertical-align: top;
+		}
+
+		tr:last-child td {
+			border-bottom: none;
+		}
+
+		/* Visual Diagram Figure */
+		.diagram-card {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			border-radius: 12px;
+			padding: 1.35rem;
+			margin: 1.6rem 0;
+			box-shadow: var(--shadow-sm);
+		}
+
+		.diagram-header {
+			font-family: var(--font-mono);
+			font-size: 0.74rem;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+			color: var(--text-muted);
+			margin-bottom: 0.9rem;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+
+		.diagram-svg-wrap {
+			width: 100%;
+			overflow-x: auto;
+			display: flex;
+			justify-content: center;
+		}
+
+		.diagram-caption {
+			font-family: var(--font-sans);
+			font-size: 0.8rem;
+			color: var(--text-muted);
+			margin-top: 0.8rem;
+			text-align: center;
+		}
+
+		/* Novice vs Pro Comparison Grid */
+		.vs-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 1rem;
+			margin: 1.4rem 0;
+		}
+
+		.vs-card {
+			border-radius: 10px;
+			padding: 1.15rem 1.25rem;
+			border: 1px solid var(--border-subtle);
+		}
+
+		.vs-card.novice {
+			background: var(--accent-danger-soft);
+			border-color: var(--accent-danger-border);
+		}
+
+		.vs-card.pro {
+			background: var(--accent-pro-soft);
+			border-color: var(--accent-pro-border);
+		}
+
+		.vs-badge {
+			font-family: var(--font-mono);
+			font-size: 0.72rem;
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			display: inline-block;
+			margin-bottom: 0.55rem;
+		}
+
+		.vs-card.novice .vs-badge { color: var(--accent-danger); }
+		.vs-card.pro .vs-badge { color: var(--accent-pro); }
+
+		/* Interactive Lab Container */
+		.interactive-lab {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-strong);
+			border-radius: 12px;
+			padding: 1.5rem;
+			margin: 2rem 0;
+			box-shadow: var(--shadow-sm);
+		}
+
+		.lab-header {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: space-between;
+			align-items: center;
+			gap: 0.75rem;
+			padding-bottom: 0.9rem;
+			margin-bottom: 1.1rem;
+			border-bottom: 1px solid var(--border-subtle);
+		}
+
+		.lab-badge {
+			font-family: var(--font-mono);
+			font-size: 0.7rem;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+			color: var(--accent-primary);
+			background: var(--accent-primary-soft);
+			padding: 0.2rem 0.6rem;
+			border-radius: 4px;
+			border: 1px solid var(--accent-primary-border);
+		}
+
+		.lab-title {
+			font-family: var(--font-sans);
+			font-size: 1.05rem;
+			font-weight: 700;
+			letter-spacing: -0.01em;
+			color: var(--text-primary);
+		}
+
+		.lab-controls {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+			margin-bottom: 1rem;
+		}
+
+		.lab-btn {
+			font-family: var(--font-sans);
+			font-size: 0.78rem;
+			font-weight: 600;
+			padding: 0.42rem 0.8rem;
+			border-radius: 6px;
+			border: 1px solid var(--border-strong);
+			background: var(--bg-elevated);
+			color: var(--text-secondary);
+			cursor: pointer;
+			transition: all 0.15s ease;
+		}
+
+		.lab-btn:hover {
+			border-color: var(--text-primary);
+			color: var(--text-primary);
+			background: var(--bg-surface);
+		}
+
+		.lab-btn.active {
+			background: var(--text-primary);
+			color: var(--bg-primary);
+			border-color: var(--text-primary);
+		}
+
+		.lab-btn.primary-action {
+			background: var(--accent-primary-soft);
+			color: var(--accent-primary);
+			border-color: var(--accent-primary-border);
+		}
+
+		.lab-btn.primary-action:hover,
+		.lab-btn.primary-action.active {
+			background: var(--accent-primary);
+			color: #FFFFFF;
+			border-color: var(--accent-primary);
+		}
+
+		.lab-btn.danger-btn {
+			background: var(--accent-danger-soft);
+			color: var(--accent-danger);
+			border-color: var(--accent-danger-border);
+		}
+
+		.lab-btn.danger-btn.active {
+			background: var(--accent-danger);
+			color: #FFFFFF;
+			border-color: var(--accent-danger);
+		}
+
+		.lab-stage {
+			background: var(--bg-elevated);
+			border: 1px solid var(--border-subtle);
+			border-radius: 10px;
+			padding: 1.15rem;
+		}
+
+		.metric-pills {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+			gap: 0.65rem;
+			margin-top: 0.9rem;
+		}
+
+		.metric-card {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			border-radius: 8px;
+			padding: 0.65rem 0.85rem;
+		}
+
+		.metric-label {
+			font-family: var(--font-mono);
+			font-size: 0.66rem;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+			color: var(--text-muted);
+			display: block;
+		}
+
+		.metric-val {
+			font-family: var(--font-mono);
+			font-size: 1.05rem;
+			font-weight: 700;
+			color: var(--text-primary);
+			margin-top: 0.2rem;
+			display: block;
+		}
+
+		/* Personal Notes Comparison Card */
+		.personal-notes-card {
+			background: var(--bg-secondary);
+			border: 1px dashed var(--border-strong);
+			border-radius: 12px;
+			padding: 1.25rem 1.4rem;
+			margin: 1.75rem 0;
+		}
+
+		.personal-notes-title {
+			font-family: var(--font-mono);
+			font-size: 0.76rem;
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+			color: var(--text-secondary);
+			margin-bottom: 0.65rem;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		/* Self-Check Quiz Accordion */
+		.mastery-box {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-strong);
+			border-radius: 12px;
+			padding: 1.35rem;
+			margin-top: 2rem;
+		}
+
+		details.solution-reveal {
+			margin-top: 0.85rem;
+			background: var(--bg-elevated);
+			border: 1px solid var(--border-subtle);
+			border-radius: 8px;
+			padding: 0.75rem 1rem;
+		}
+
+		details.solution-reveal summary {
+			font-family: var(--font-sans);
+			font-size: 0.86rem;
+			font-weight: 700;
+			color: var(--accent-primary);
+			cursor: pointer;
+		}
+
+		details.solution-reveal .solution-body {
+			margin-top: 0.85rem;
+			padding-top: 0.85rem;
+			border-top: 1px solid var(--border-subtle);
+			font-size: 0.92rem;
+		}
+
+		/* Slider controls */
+		.slider-group {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+			gap: 0.85rem;
+			margin-bottom: 1rem;
+		}
+
+		.slider-item {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			padding: 0.7rem 0.85rem;
+			border-radius: 8px;
+		}
+
+		.slider-top {
+			display: flex;
+			justify-content: space-between;
+			font-family: var(--font-sans);
+			font-size: 0.78rem;
+			font-weight: 600;
+			margin-bottom: 0.35rem;
+		}
+
+		.slider-top span:last-child {
+			font-family: var(--font-mono);
+			color: var(--accent-primary);
+		}
+
+		input[type="range"] {
+			width: 100%;
+			accent-color: var(--accent-primary);
+			cursor: pointer;
+		}
+
+		/* ================================================================= */
+		/* MINIMALIST ARCHITECTURAL ANIMATIONS & SCHEMATIC DIAGRAMS          */
+		/* ================================================================= */
+		@keyframes pulseSubtle {
+			0%, 100% { opacity: 0.65; }
+			50% { opacity: 1; }
+		}
+
+		.visual-canvas-box {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			border-radius: 10px;
+			padding: 1.15rem 1.25rem;
+			margin-bottom: 0.9rem;
+			overflow: hidden;
+			position: relative;
+			box-shadow: var(--shadow-sm);
+		}
+
+		.schematic-header {
+			font-family: var(--font-mono);
+			font-size: 0.7rem;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+			color: var(--text-muted);
+			margin-bottom: 0.8rem;
+			padding-bottom: 0.55rem;
+			border-bottom: 1px solid var(--border-subtle);
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+		}
+
+		.canvas-status-pill {
+			font-family: var(--font-mono);
+			font-size: 0.68rem;
+			font-weight: 600;
+			padding: 0.16rem 0.55rem;
+			border-radius: 4px;
+			background: var(--bg-elevated);
+			color: var(--text-secondary);
+			border: 1px solid var(--border-strong);
+		}
+
+		/* Minimalist Fiber Cable Schematic (1.2) */
+		.fiber-scene {
+			background: var(--bg-surface);
+			border-radius: 10px;
+			padding: 1.15rem 1.25rem;
+			color: var(--text-primary);
+			position: relative;
+			overflow: hidden;
+			border: 1px solid var(--border-subtle);
+			box-shadow: var(--shadow-sm);
+		}
+
+		.fiber-nodes-row {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 0.75rem;
+			position: relative;
+			z-index: 3;
+		}
+
+		.fiber-endpoint {
+			background: var(--accent-primary-soft);
+			border: 1.5px solid var(--accent-primary);
+			border-radius: 8px;
+			padding: 0.65rem 0.85rem;
+			min-width: 155px;
+			text-align: center;
+		}
+
+		.fiber-endpoint.server-end {
+			background: var(--bg-elevated);
+			border-color: var(--border-strong);
+		}
+
+		.fiber-endpoint.server-end.tls-active {
+			background: var(--accent-pro-soft);
+			border-color: var(--accent-pro);
+		}
+
+		.fiber-endpoint-title {
+			font-family: var(--font-sans);
+			font-size: 0.74rem;
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+			color: var(--text-primary);
+			display: block;
+		}
+
+		.fiber-endpoint-sub {
+			font-family: var(--font-mono);
+			font-size: 0.68rem;
+			color: var(--text-secondary);
+			display: block;
+			margin-top: 0.2rem;
+		}
+
+		.fiber-cable-corridor {
+			flex: 1;
+			position: relative;
+			height: 86px;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+		}
+
+		.fiber-sheath {
+			height: 26px;
+			background: var(--bg-secondary);
+			border: 1.5px solid var(--border-strong);
+			border-radius: 999px;
+			position: relative;
+			overflow: hidden;
+			display: flex;
+			align-items: center;
+			transition: border-color 0.25s ease, background-color 0.25s ease;
+		}
+
+		.fiber-sheath.tls-locked {
+			background: var(--accent-pro-soft);
+			border-color: var(--accent-pro);
+		}
+
+		.fiber-core-beam {
+			width: 100%;
+			height: 1.5px;
+			background: repeating-linear-gradient(90deg, transparent 0 8px, var(--border-strong) 8px 16px);
+		}
+
+		.fiber-sheath.tls-locked .fiber-core-beam {
+			background: repeating-linear-gradient(90deg, transparent 0 8px, var(--accent-pro) 8px 16px);
+		}
+
+		.traveling-packet {
+			position: absolute;
+			top: 50%;
+			transform: translate(-50%, -50%);
+			background: var(--accent-primary);
+			color: #FFFFFF;
+			font-family: var(--font-mono);
+			font-size: 0.66rem;
+			font-weight: 600;
+			padding: 0.16rem 0.55rem;
+			border-radius: 4px;
+			white-space: nowrap;
+			border: 1px solid rgba(255, 255, 255, 0.25);
+			box-shadow: var(--shadow-sm);
+			transition: left 0.65s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
+			z-index: 5;
+			pointer-events: none;
+		}
+
+		/* Water Pipe Comparison (Bandwidth vs Latency) */
+		.pipe-lane {
+			margin-bottom: 0.75rem;
+		}
+
+		.pipe-tube {
+			background: var(--bg-secondary);
+			border: 1.5px solid var(--border-strong);
+			border-radius: 6px;
+			position: relative;
+			overflow: hidden;
+			width: 100%;
+		}
+
+		.pipe-drop {
+			position: absolute;
+			background: var(--accent-primary);
+			border-radius: 3px;
+			width: 24px;
+			height: 8px;
+			transition: left 1.1s linear;
+		}
+
+		/* Disk Blocks Grid (1.3 Offset vs Cursor) */
+		.disk-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+			gap: 0.35rem;
+			margin-top: 0.75rem;
+		}
+
+		.disk-cell {
+			font-family: var(--font-mono);
+			font-size: 0.64rem;
+			text-align: center;
+			padding: 0.32rem 0.2rem;
+			border-radius: 4px;
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			color: var(--text-muted);
+			transition: all 0.12s ease;
+		}
+
+		.disk-cell.scanned-waste {
+			background: var(--accent-danger-soft);
+			border-color: var(--accent-danger-border);
+			color: var(--accent-danger);
+			font-weight: 600;
+		}
+
+		.disk-cell.btree-hop {
+			background: var(--accent-memory-soft);
+			border-color: var(--accent-memory);
+			color: var(--accent-memory);
+			font-weight: 700;
+		}
+
+		.disk-cell.target-hit {
+			background: var(--accent-pro);
+			border-color: var(--accent-pro);
+			color: #FFFFFF;
+			font-weight: 700;
+		}
+
+		/* Hardware Race Track (1.4) */
+		.race-lane {
+			margin-bottom: 0.7rem;
+		}
+
+		.race-lane-header {
+			display: flex;
+			justify-content: space-between;
+			font-family: var(--font-mono);
+			font-size: 0.72rem;
+			color: var(--text-secondary);
+			margin-bottom: 0.25rem;
+		}
+
+		.race-bar-track {
+			height: 14px;
+			background: var(--bg-secondary);
+			border: 1px solid var(--border-strong);
+			border-radius: 4px;
+			position: relative;
+			overflow: hidden;
+		}
+
+		.race-runner {
+			height: 100%;
+			width: 0%;
+			border-radius: 3px;
+			transition: width 0.1s linear;
+		}
+
+		/* Connection Pool & Fan-out Grid (1.5) */
+		.pool-slots-grid {
+			display: grid;
+			grid-template-columns: repeat(20, 1fr);
+			gap: 4px;
+			margin: 0.65rem 0;
+		}
+
+		.pool-slot {
+			height: 12px;
+			border-radius: 2px;
+			background: var(--bg-secondary);
+			border: 1px solid var(--border-subtle);
+			transition: background-color 0.2s ease;
+		}
+
+		.pool-slot.active-ok {
+			background: var(--accent-pro);
+			border-color: var(--accent-pro);
+		}
+
+		.pool-slot.active-warn {
+			background: var(--accent-warn);
+			border-color: var(--accent-warn);
+		}
+
+		.pool-slot.active-full {
+			background: var(--accent-danger);
+			border-color: var(--accent-danger);
+		}
+
+		.fanout-nodes-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+			gap: 4px;
+			margin-top: 0.65rem;
+		}
+
+		.fanout-node {
+			height: 22px;
+			border-radius: 4px;
+			font-family: var(--font-mono);
+			font-size: 0.6rem;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			color: var(--text-muted);
+			transition: all 0.2s ease;
+		}
+
+		.fanout-node.fast-ok {
+			background: var(--accent-pro-soft);
+			border-color: var(--accent-pro-border);
+			color: var(--accent-pro);
+			font-weight: 600;
+		}
+
+		.fanout-node.slow-tail {
+			background: var(--accent-danger);
+			border-color: var(--accent-danger);
+			color: #FFFFFF;
+			font-weight: 700;
+			animation: pulseSubtle 0.9s infinite;
+		}
+
+		.fanout-node.hedged-saved {
+			background: var(--accent-primary);
+			border-color: var(--accent-primary);
+			color: #FFFFFF;
+			font-weight: 700;
+		}
+
+		/* Responsive */
+		@media (max-width: 1024px) {
+			.app-shell,
+			.app-shell.sidebar-collapsed {
+				grid-template-columns: 1fr;
+			}
+			.sidebar {
+				position: relative;
+				width: 100%;
+				height: auto;
+				border-right: none;
+				border-bottom: 1px solid var(--border-subtle);
+			}
+			.app-shell.sidebar-collapsed .sidebar {
+				display: none;
+			}
+			.chain-steps {
+				grid-template-columns: 1fr 1fr;
+			}
+			.vs-grid {
+				grid-template-columns: 1fr;
+			}
+			.main-content {
+				padding: 2rem 1.25rem 4rem;
+			}
+			.hero-title {
+				font-size: 2.35rem;
+			}
+			.chapter-title {
+				font-size: 2rem;
+			}
+		}
+
+		/* ================================================================= */
+		/* FASE 2 · COMPONENTES VISUALES ADICIONALES                          */
+		/* ================================================================= */
+		@keyframes flowDash { to { stroke-dashoffset: -24; } }
+		@keyframes popIn { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+		@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+		.flow-line { stroke-dasharray: 6 6; animation: flowDash 1.1s linear infinite; }
+		.pop-in { animation: popIn 0.28s ease both; }
+		.shake { animation: shake 0.3s ease 2; }
+
+		.prev-phase-link {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			font-family: var(--font-sans);
+			font-size: 0.78rem;
+			font-weight: 600;
+			color: var(--accent-memory);
+			background: var(--accent-memory-soft);
+			border: 1px solid var(--accent-memory-border);
+			padding: 0.5rem 0.7rem;
+			border-radius: 8px;
+			text-decoration: none;
+			margin-top: 0.6rem;
+		}
+		.prev-phase-link:hover { background: var(--accent-memory); color: #FFFFFF; }
+
+		/* Mini tablas de datos (JOINs, normalización) */
+		.mini-tables-row {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			gap: 0.85rem;
+			margin: 0.75rem 0;
+		}
+		.mini-table {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			border-radius: 8px;
+			overflow: hidden;
+			font-family: var(--font-mono);
+			font-size: 0.72rem;
+		}
+		.mini-table-title {
+			font-family: var(--font-sans);
+			font-size: 0.7rem;
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			padding: 0.45rem 0.65rem;
+			background: var(--bg-secondary);
+			border-bottom: 1px solid var(--border-subtle);
+			color: var(--text-secondary);
+			display: flex;
+			justify-content: space-between;
+		}
+		.mini-row {
+			display: grid;
+			grid-template-columns: var(--cols, 1fr 1fr 1fr);
+			gap: 0.4rem;
+			padding: 0.32rem 0.65rem;
+			border-bottom: 1px solid var(--border-subtle);
+			color: var(--text-secondary);
+			transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+		}
+		.mini-row:last-child { border-bottom: none; }
+		.mini-row.head { color: var(--text-muted); font-weight: 600; background: var(--bg-elevated); }
+		.mini-row.scan { background: var(--accent-primary-soft); color: var(--accent-primary); font-weight: 600; }
+		.mini-row.match { background: var(--accent-pro-soft); color: var(--accent-pro); font-weight: 600; }
+		.mini-row.nomatch { background: var(--accent-danger-soft); color: var(--accent-danger); }
+		.mini-row.nullfill { background: var(--accent-warn-soft); color: var(--accent-warn); }
+		.mini-row.dim { opacity: 0.35; }
+		.mini-row.bad-cell span.bad { color: var(--accent-danger); font-weight: 700; }
+		.cell-bad { color: var(--accent-danger); font-weight: 700; }
+		.cell-good { color: var(--accent-pro); font-weight: 700; }
+		.cell-null { color: var(--accent-warn); font-style: italic; }
+
+		/* Saldos / cuentas (ACID) */
+		.account-row {
+			display: grid;
+			grid-template-columns: 1fr auto 1fr;
+			gap: 1rem;
+			align-items: center;
+		}
+		.account-box {
+			background: var(--bg-surface);
+			border: 1.5px solid var(--border-strong);
+			border-radius: 10px;
+			padding: 0.8rem 1rem;
+			text-align: center;
+			transition: border-color 0.25s ease, background-color 0.25s ease;
+		}
+		.account-box.debit { border-color: var(--accent-warn); background: var(--accent-warn-soft); }
+		.account-box.credit { border-color: var(--accent-pro); background: var(--accent-pro-soft); }
+		.account-box.lost { border-color: var(--accent-danger); background: var(--accent-danger-soft); }
+		.account-name { font-family: var(--font-sans); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); display: block; }
+		.account-bal { font-family: var(--font-mono); font-size: 1.45rem; font-weight: 700; color: var(--text-primary); display: block; margin-top: 0.15rem; }
+		.wal-log {
+			margin-top: 0.85rem;
+			background: var(--bg-code);
+			border-radius: 8px;
+			padding: 0.7rem 0.9rem;
+			font-family: var(--font-mono);
+			font-size: 0.72rem;
+			color: #CBD5E1;
+			min-height: 92px;
+			line-height: 1.6;
+		}
+		.wal-log .ok { color: #34D399; }
+		.wal-log .warn { color: #FBBF24; }
+		.wal-log .err { color: #FB7185; }
+		.wal-log .dim { color: #64748B; }
+
+		/* Columnas de índice compuesto */
+		.col-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; margin: 0.6rem 0; }
+		.col-chip {
+			font-family: var(--font-mono);
+			font-size: 0.78rem;
+			font-weight: 600;
+			padding: 0.35rem 0.7rem;
+			border-radius: 6px;
+			border: 1.5px solid var(--border-strong);
+			background: var(--bg-surface);
+			color: var(--text-muted);
+			transition: all 0.25s ease;
+		}
+		.col-chip.used { border-color: var(--accent-pro); background: var(--accent-pro-soft); color: var(--accent-pro); }
+		.col-chip.range { border-color: var(--accent-warn); background: var(--accent-warn-soft); color: var(--accent-warn); }
+		.col-chip.broken { border-color: var(--accent-danger); background: var(--accent-danger-soft); color: var(--accent-danger); text-decoration: line-through; }
+		.col-chip-arrow { color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem; }
+
+		/* Páginas B-Tree (UUID vs secuencial) */
+		.pages-row {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+			gap: 0.45rem;
+			margin-top: 0.6rem;
+		}
+		.leaf-page {
+			background: var(--bg-surface);
+			border: 1.5px solid var(--border-strong);
+			border-radius: 6px;
+			padding: 0.3rem;
+			min-height: 74px;
+			transition: border-color 0.2s ease, background-color 0.2s ease;
+		}
+		.leaf-page.touched { border-color: var(--accent-primary); background: var(--accent-primary-soft); }
+		.leaf-page.split { border-color: var(--accent-danger); background: var(--accent-danger-soft); }
+		.leaf-page-title { font-family: var(--font-mono); font-size: 0.58rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 0.2rem; }
+		.leaf-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+		.leaf-slot {
+			height: 16px;
+			border-radius: 2px;
+			background: var(--bg-secondary);
+			border: 1px dashed var(--border-subtle);
+			font-family: var(--font-mono);
+			font-size: 0.52rem;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: var(--text-muted);
+		}
+		.leaf-slot.filled { background: var(--accent-memory-soft); border: 1px solid var(--accent-memory-border); color: var(--accent-memory); font-weight: 700; }
+		.leaf-slot.fresh { background: var(--accent-pro); border-color: var(--accent-pro); color: #FFFFFF; }
+
+		/* Bits de Snowflake */
+		.bits-strip {
+			display: grid;
+			grid-template-columns: repeat(64, 1fr);
+			gap: 1px;
+			margin: 0.6rem 0 0.35rem;
+		}
+		.bit {
+			font-family: var(--font-mono);
+			font-size: 0.5rem;
+			text-align: center;
+			padding: 0.28rem 0;
+			border-radius: 2px;
+			color: #FFFFFF;
+			font-weight: 700;
+			transition: background-color 0.2s ease;
+		}
+		.bit.sign { background: var(--text-muted); }
+		.bit.ts { background: var(--accent-primary); }
+		.bit.mach { background: var(--accent-memory); }
+		.bit.seq { background: var(--accent-pro); }
+		.bit.zero { opacity: 0.38; }
+		.bits-legend { display: flex; flex-wrap: wrap; gap: 0.8rem; font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-secondary); }
+		.bits-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 0.3rem; vertical-align: -1px; background: var(--c); }
+
+		/* División sucesiva Base62 */
+		.division-steps { font-family: var(--font-mono); font-size: 0.74rem; margin-top: 0.6rem; }
+		.division-step {
+			display: grid;
+			grid-template-columns: 1.6fr 0.4fr 1.2fr 0.6fr 0.5fr;
+			gap: 0.4rem;
+			padding: 0.3rem 0.55rem;
+			border-bottom: 1px solid var(--border-subtle);
+			color: var(--text-secondary);
+		}
+		.division-step.head { color: var(--text-muted); font-weight: 600; }
+		.division-step .char { color: var(--accent-pro); font-weight: 700; }
+		.b62-output {
+			font-family: var(--font-mono);
+			font-size: 1.4rem;
+			font-weight: 700;
+			letter-spacing: 0.08em;
+			color: var(--accent-pro);
+			margin-top: 0.6rem;
+		}
+		.b62-output span { display: inline-block; }
+
+		/* Cronogramas de transacciones */
+		.tx-timeline {
+			display: grid;
+			grid-template-columns: 46px 1fr 1fr 0.9fr;
+			border: 1px solid var(--border-subtle);
+			border-radius: 8px;
+			overflow: hidden;
+			font-family: var(--font-mono);
+			font-size: 0.72rem;
+			background: var(--bg-surface);
+		}
+		.tx-cell {
+			padding: 0.42rem 0.55rem;
+			border-bottom: 1px solid var(--border-subtle);
+			color: var(--text-muted);
+			min-height: 30px;
+			transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+		}
+		.tx-cell.h { font-family: var(--font-sans); font-weight: 700; font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase; background: var(--bg-secondary); color: var(--text-secondary); }
+		.tx-cell.t1 { border-left: 3px solid transparent; }
+		.tx-cell.future { opacity: 0.25; }
+		.tx-cell.now { background: var(--accent-primary-soft); color: var(--text-primary); font-weight: 600; }
+		.tx-cell.bad { background: var(--accent-danger-soft); color: var(--accent-danger); font-weight: 700; }
+		.tx-cell.good { background: var(--accent-pro-soft); color: var(--accent-pro); font-weight: 700; }
+		.tx-cell.wait { background: var(--accent-warn-soft); color: var(--accent-warn); font-weight: 600; }
+		.verdict-box {
+			margin-top: 0.8rem;
+			border-radius: 8px;
+			padding: 0.7rem 0.9rem;
+			font-size: 0.86rem;
+			border: 1px solid var(--border-subtle);
+			background: var(--bg-surface);
+		}
+		.verdict-box.bad { border-color: var(--accent-danger-border); background: var(--accent-danger-soft); }
+		.verdict-box.good { border-color: var(--accent-pro-border); background: var(--accent-pro-soft); }
+
+		/* Cadena de versiones MVCC */
+		.version-chain { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.4rem; margin-top: 0.6rem; }
+		.version-card {
+			flex: 1 1 130px;
+			background: var(--bg-surface);
+			border: 1.5px solid var(--border-strong);
+			border-radius: 8px;
+			padding: 0.55rem 0.7rem;
+			font-family: var(--font-mono);
+			font-size: 0.7rem;
+			color: var(--text-secondary);
+			transition: all 0.25s ease;
+			position: relative;
+		}
+		.version-card .v-val { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); display: block; margin: 0.15rem 0; }
+		.version-card.visible { border-color: var(--accent-pro); background: var(--accent-pro-soft); box-shadow: 0 0 0 3px var(--accent-pro-soft); }
+		.version-card.visible .v-val { color: var(--accent-pro); }
+		.version-card.dead { border-style: dashed; opacity: 0.45; }
+		.version-card.vacuumed { opacity: 0.12; transform: scale(0.95); }
+		.version-arrow { align-self: center; color: var(--text-muted); font-family: var(--font-mono); }
+
+		/* Carriles de concurrencia */
+		.lane-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+		.lane {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-subtle);
+			border-radius: 8px;
+			padding: 0.6rem 0.75rem;
+			font-family: var(--font-mono);
+			font-size: 0.72rem;
+			min-height: 150px;
+		}
+		.lane-title { font-family: var(--font-sans); font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 0.4rem; }
+		.lane-step { padding: 0.18rem 0.4rem; border-radius: 4px; margin-bottom: 0.2rem; color: var(--text-secondary); }
+		.lane-step.ok { background: var(--accent-pro-soft); color: var(--accent-pro); }
+		.lane-step.warn { background: var(--accent-warn-soft); color: var(--accent-warn); }
+		.lane-step.err { background: var(--accent-danger-soft); color: var(--accent-danger); }
+		.lane-step.info { background: var(--accent-primary-soft); color: var(--accent-primary); }
+
+		/* Quiz de decisión */
+		.quiz-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 1rem 1.1rem; }
+		.quiz-q { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.7rem; }
+		.quiz-feedback { margin-top: 0.75rem; font-size: 0.88rem; border-radius: 8px; padding: 0.65rem 0.85rem; display: none; }
+		.quiz-feedback.show { display: block; }
+		.quiz-feedback.right { background: var(--accent-pro-soft); border: 1px solid var(--accent-pro-border); }
+		.quiz-feedback.wrong { background: var(--accent-danger-soft); border: 1px solid var(--accent-danger-border); }
+		.quiz-progress { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); }
+
+		/* Barras horizontales simples */
+		.hbar-row { display: grid; grid-template-columns: 150px 1fr 110px; gap: 0.6rem; align-items: center; margin-bottom: 0.45rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); }
+		.hbar-track { height: 14px; background: var(--bg-secondary); border: 1px solid var(--border-strong); border-radius: 4px; overflow: hidden; }
+		.hbar-fill { height: 100%; width: 0%; border-radius: 3px; transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+
+		/* Familias NoSQL */
+		.family-stage-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 0.9rem; }
+		.family-facts { font-size: 0.85rem; }
+		.family-facts h5 { font-family: var(--font-sans); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 0.6rem 0 0.25rem; }
+		.family-facts h5:first-child { margin-top: 0; }
+		.family-facts ul { margin: 0.2rem 0 0.4rem 1.1rem; }
+		.family-facts li { margin-bottom: 0.2rem; }
+
+		@media (max-width: 1024px) {
+			.family-stage-grid, .lane-grid { grid-template-columns: 1fr; }
+			.account-row { grid-template-columns: 1fr; }
+			.hbar-row { grid-template-columns: 110px 1fr 90px; }
+			.tx-timeline { font-size: 0.64rem; grid-template-columns: 34px 1fr 1fr 0.8fr; }
+			.bit { font-size: 0.4rem; }
+		}
+		.metric-val { overflow-wrap: anywhere; }
+
+		/* ================================================================= */
+		/* AJUSTES PARA CELULAR                                               */
+		/* ================================================================= */
+		html, body { overflow-x: clip; }
+		img, svg { max-width: 100%; }
+		@media (max-width: 680px) {
+			:root { --base-size: 16px; }
+			.main-content { padding: 1.25rem 1rem 4rem; }
+			.hero-title { font-size: 1.95rem; }
+			.chapter-title { font-size: 1.7rem; }
+			h3.section-heading { font-size: 1.15rem; flex-wrap: wrap; gap: 0.4rem; }
+			.chain-steps { grid-template-columns: 1fr; }
+			.sidebar { padding: 1rem; }
+			.interactive-lab, .diagram-card, .mastery-box { padding: 1rem 0.8rem; }
+			.lab-stage { padding: 0.75rem; }
+			.callout, .memory-bridge, .personal-notes-card { padding: 0.95rem 1rem; }
+			pre { font-size: 0.74rem; padding: 0.9rem 1rem; }
+			table { font-size: 0.8rem; }
+			th, td { padding: 0.6rem 0.7rem; }
+			/* Diagramas: se desplazan dentro de su tarjeta en vez de encogerse ilegibles */
+			.diagram-svg-wrap { justify-content: flex-start; -webkit-overflow-scrolling: touch; }
+			.diagram-svg-wrap > svg { min-width: 640px; }
+			.visual-canvas-box { overflow-x: auto; }
+			.visual-canvas-box svg { min-width: 560px; }
+			.lab-btn { font-size: 0.74rem; padding: 0.45rem 0.65rem; }
+			.metric-pills { grid-template-columns: 1fr 1fr; }
+			.metric-val { font-size: 0.92rem; word-break: break-all; }
+			.hbar-row { grid-template-columns: 1fr; gap: 0.2rem; }
+			.hbar-row > span:last-child { text-align: left !important; }
+			.tx-timeline { overflow-x: auto; }
+			.division-step { font-size: 0.66rem; grid-template-columns: 1.6fr 0.35fr 1.3fr 0.6fr 0.55fr; }
+			.mini-row { font-size: 0.66rem; }
+			.wal-log { font-size: 0.66rem; }
+			.bits-strip { gap: 0; }
+			.bit { font-size: 0.34rem; padding: 0.22rem 0; }
+			.vs-grid { grid-template-columns: 1fr; }
+		}
+		@media (max-width: 1024px) {
+			.app-shell, .app-shell.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
+			.main-content { min-width: 0; }
+			/* Índice como menú deslizable */
+			.sidebar, .app-shell.sidebar-collapsed .sidebar {
+				display: flex;
+				position: fixed;
+				top: 0; left: 0;
+				height: 100vh; height: 100dvh;
+				width: min(86vw, 340px);
+				padding: 1.1rem 1rem;
+				border-right: 1px solid var(--border-subtle);
+				border-bottom: none;
+				box-shadow: var(--shadow-md);
+				z-index: 970;
+				opacity: 1;
+				transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+			}
+			.app-shell.sidebar-collapsed .sidebar { transform: translateX(-105%); pointer-events: none; box-shadow: none; }
+			.sidebar-expand-fab { top: auto; bottom: 1rem; left: 1rem; }
+		}
+
+		/* ================================================================= */
+		/* FASE 3 · COMPONENTES VISUALES ADICIONALES                          */
+		/* ================================================================= */
+		@keyframes dotPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+		.req-grid { display: grid; grid-template-columns: repeat(20, 1fr); gap: 4px; margin: 0.6rem 0; }
+		.req-dot { aspect-ratio: 1; border-radius: 50%; background: var(--bg-secondary); border: 1px solid var(--border-strong); transition: background-color 0.2s ease, border-color 0.2s ease; }
+		.req-dot.db { background: var(--accent-danger); border-color: var(--accent-danger); animation: dotPulse 0.6s ease 2; }
+		.req-dot.wait { background: var(--accent-warn); border-color: var(--accent-warn); }
+		.req-dot.leader { background: var(--accent-memory); border-color: var(--accent-memory); animation: dotPulse 0.6s ease infinite; }
+		.req-dot.ok { background: var(--accent-pro); border-color: var(--accent-pro); }
+		.req-dot.stale { background: var(--accent-primary); border-color: var(--accent-primary); }
+
+		.lru-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.5rem 0; }
+		.lru-node { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; min-width: 54px; text-align: center; padding: 0.45rem 0.55rem; border-radius: 8px; border: 1.5px solid var(--border-strong); background: var(--bg-surface); color: var(--text-primary); transition: all 0.25s ease; }
+		.lru-node small { display: block; font-size: 0.6rem; font-weight: 500; color: var(--text-muted); }
+		.lru-node.hit { border-color: var(--accent-pro); background: var(--accent-pro-soft); color: var(--accent-pro); }
+		.lru-node.new { border-color: var(--accent-primary); background: var(--accent-primary-soft); color: var(--accent-primary); }
+		.lru-node.evict { border-color: var(--accent-danger); background: var(--accent-danger-soft); color: var(--accent-danger); text-decoration: line-through; opacity: 0.75; }
+		.lru-node.sentinel { border-style: dashed; color: var(--text-muted); font-size: 0.66rem; min-width: 44px; }
+		.lru-link { color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem; }
+		.hash-pane { font-family: var(--font-mono); font-size: 0.72rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.5rem 0.7rem; color: var(--text-secondary); }
+
+		.bloom-bits { display: grid; grid-template-columns: repeat(32, 1fr); gap: 2px; margin: 0.5rem 0; }
+		.bloom-bit { font-family: var(--font-mono); font-size: 0.55rem; text-align: center; padding: 0.3rem 0; border-radius: 3px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); color: var(--text-muted); transition: all 0.2s ease; }
+		.bloom-bit.on { background: var(--accent-memory); border-color: var(--accent-memory); color: #FFFFFF; }
+		.bloom-bit.probe { box-shadow: 0 0 0 2px var(--accent-warn); }
+		.bloom-bit.probe-miss { box-shadow: 0 0 0 2px var(--accent-danger); }
+
+		.histo { display: flex; align-items: flex-end; gap: 1px; height: 150px; border-bottom: 1.5px solid var(--border-strong); position: relative; margin-top: 0.6rem; }
+		.histo-bar { flex: 1; background: var(--accent-primary); border-radius: 2px 2px 0 0; transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease; min-height: 0; }
+		.histo-bar.over { background: var(--accent-danger); }
+		.histo-cap { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--accent-danger); }
+		.histo-cap span { position: absolute; right: 0; top: -1.2rem; font-family: var(--font-mono); font-size: 0.62rem; color: var(--accent-danger); }
+		.histo-axis { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+		.cache-items { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; }
+		.cache-item { font-family: var(--font-mono); font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 5px; background: var(--accent-pro-soft); border: 1px solid var(--accent-pro-border); color: var(--accent-pro); }
+		.cache-item.stale { background: var(--accent-warn-soft); border-color: var(--accent-warn-border); color: var(--accent-warn); }
+		.cache-item.null { background: var(--bg-secondary); border-color: var(--border-strong); color: var(--text-muted); }
+		.step-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-primary); color: #FFFFFF; font-family: var(--font-mono); font-size: 0.66rem; font-weight: 700; margin-right: 0.35rem; }
+		@media (max-width: 680px) {
+			.req-grid { grid-template-columns: repeat(16, 1fr); gap: 3px; }
+			.bloom-bits { grid-template-columns: repeat(16, 1fr); }
+			.histo { height: 120px; }
+		}
+		.chain-steps.three { grid-template-columns: repeat(3, 1fr); }
+		@media (max-width: 680px) { .chain-steps.three { grid-template-columns: 1fr; } }
+
+		/* ================================================================= */
+		/* FASE 4 · COMPONENTES VISUALES ADICIONALES                          */
+		/* ================================================================= */
+		.server-row { display: grid; grid-template-columns: repeat(var(--n, 4), 1fr); gap: 0.5rem; margin-top: 0.6rem; }
+		.server-card { background: var(--bg-surface); border: 1.5px solid var(--border-strong); border-radius: 9px; padding: 0.55rem 0.6rem; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-secondary); transition: all 0.25s ease; }
+		.server-card .sv-name { font-family: var(--font-sans); font-weight: 700; font-size: 0.74rem; color: var(--text-primary); display: flex; justify-content: space-between; }
+		.server-card.down { border-color: var(--accent-danger); background: var(--accent-danger-soft); }
+		.server-card.suspect { border-color: var(--accent-warn); background: var(--accent-warn-soft); }
+		.server-card.hit { border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-primary-soft); }
+		.conn-bar { height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; margin: 0.35rem 0 0.2rem; }
+		.conn-bar > div { height: 100%; background: var(--accent-primary); transition: width 0.2s ease; }
+		.key-grid { display: grid; grid-template-columns: repeat(40, 1fr); gap: 2px; margin-top: 0.6rem; }
+		.key-cell { aspect-ratio: 1; border-radius: 2px; transition: background-color 0.3s ease, transform 0.3s ease; }
+		.key-cell.moved { outline: 2px solid var(--text-primary); transform: scale(0.75); }
+		.phase-track { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.35rem; margin: 0.6rem 0; }
+		.phase-pill { font-family: var(--font-mono); font-size: 0.64rem; text-align: center; padding: 0.35rem 0.2rem; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg-surface); color: var(--text-muted); transition: all 0.25s ease; }
+		.phase-pill.done { background: var(--accent-pro-soft); border-color: var(--accent-pro); color: var(--accent-pro); }
+		.phase-pill.now { background: var(--accent-primary); border-color: var(--accent-primary); color: #FFFFFF; font-weight: 700; }
+		.legend-dots { display: flex; flex-wrap: wrap; gap: 0.7rem; font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-secondary); margin-top: 0.4rem; }
+		.legend-dots span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 0.3rem; vertical-align: -1px; background: var(--c); }
+		@media (max-width: 680px) {
+			.server-row { grid-template-columns: repeat(2, 1fr); }
+			.key-grid { grid-template-columns: repeat(25, 1fr); }
+			.phase-track { grid-template-columns: repeat(3, 1fr); }
+		}
+		@media (max-width: 760px) { .ring-layout { grid-template-columns: 1fr !important; } }
+
+		/* ================================================================= */
+		/* FASE 5 · COMPONENTES VISUALES ADICIONALES                          */
+		/* ================================================================= */
+		.raft-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0.9rem; align-items: start; }
+		.raft-log { font-family: var(--font-mono); font-size: 0.68rem; }
+		.raft-log-row { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.3rem; }
+		.raft-log-row .who { width: 62px; color: var(--text-secondary); font-weight: 700; }
+		.log-entry { min-width: 30px; text-align: center; padding: 0.18rem 0.3rem; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--bg-surface); color: var(--text-muted); }
+		.log-entry.committed { background: var(--accent-pro-soft); border-color: var(--accent-pro); color: var(--accent-pro); font-weight: 700; }
+		.log-entry.pending { background: var(--accent-warn-soft); border-color: var(--accent-warn); color: var(--accent-warn); }
+		.fsm-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.6rem 0; }
+		.fsm-state { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; padding: 0.55rem 0.9rem; border-radius: 999px; border: 2px solid var(--border-strong); color: var(--text-muted); background: var(--bg-surface); transition: all 0.3s ease; }
+		.fsm-state.on.closed { border-color: var(--accent-pro); background: var(--accent-pro-soft); color: var(--accent-pro); box-shadow: 0 0 0 4px var(--accent-pro-soft); }
+		.fsm-state.on.open { border-color: var(--accent-danger); background: var(--accent-danger-soft); color: var(--accent-danger); box-shadow: 0 0 0 4px var(--accent-danger-soft); }
+		.fsm-state.on.half { border-color: var(--accent-warn); background: var(--accent-warn-soft); color: var(--accent-warn); box-shadow: 0 0 0 4px var(--accent-warn-soft); }
+		.fsm-arrow { color: var(--text-muted); font-family: var(--font-mono); }
+		.gossip-grid { display: grid; grid-template-columns: repeat(25, 1fr); gap: 3px; margin-top: 0.5rem; }
+		.gossip-node { aspect-ratio: 1; border-radius: 50%; background: var(--bg-secondary); border: 1px solid var(--border-strong); transition: background-color 0.25s ease, transform 0.25s ease; }
+		.gossip-node.on { background: var(--accent-memory); border-color: var(--accent-memory); }
+		.gossip-node.fresh { background: var(--accent-warn); border-color: var(--accent-warn); transform: scale(1.25); }
+		.vc-input { font-family: var(--font-mono); font-size: 0.82rem; padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg-surface); color: var(--text-primary); width: 100%; }
+		@media (max-width: 760px) { .raft-layout { grid-template-columns: 1fr; } .gossip-grid { grid-template-columns: repeat(20, 1fr); } }
+
+		/* ================================================================= */
+		/* FASE 6 · COMPONENTES VISUALES ADICIONALES                          */
+		/* ================================================================= */
+		.queue-lane { display: flex; flex-wrap: wrap; gap: 4px; min-height: 34px; padding: 0.45rem; border: 1.5px dashed var(--border-strong); border-radius: 8px; background: var(--bg-surface); align-items: center; }
+		.msg-chip { font-family: var(--font-mono); font-size: 0.64rem; font-weight: 700; padding: 0.2rem 0.4rem; border-radius: 4px; background: var(--accent-primary-soft); border: 1px solid var(--accent-primary-border); color: var(--accent-primary); animation: popIn 0.25s ease both; }
+		.msg-chip.poison { background: var(--accent-danger-soft); border-color: var(--accent-danger); color: var(--accent-danger); }
+		.msg-chip.inflight { opacity: 0.4; border-style: dashed; }
+		.msg-chip.retry { background: var(--accent-warn-soft); border-color: var(--accent-warn); color: var(--accent-warn); }
+		.worker-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.45rem; margin: 0.6rem 0; }
+		.worker-box { font-family: var(--font-mono); font-size: 0.68rem; padding: 0.5rem; border-radius: 8px; border: 1.5px solid var(--border-strong); background: var(--bg-surface); color: var(--text-secondary); min-height: 58px; }
+		.worker-box b { display: block; font-family: var(--font-sans); color: var(--text-primary); font-size: 0.74rem; margin-bottom: 0.2rem; }
+		.worker-box.busy { border-color: var(--accent-pro); background: var(--accent-pro-soft); }
+		.worker-box.dead { border-color: var(--accent-danger); background: var(--accent-danger-soft); }
+		.kafka-part { display: grid; grid-template-columns: 92px 1fr; gap: 0.4rem; align-items: center; margin-bottom: 0.4rem; }
+		.kafka-part .pname { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); }
+		.kafka-log { display: flex; gap: 3px; flex-wrap: wrap; padding: 0.35rem; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-surface); min-height: 34px; }
+		.kafka-ev { font-family: var(--font-mono); font-size: 0.6rem; font-weight: 700; padding: 0.2rem 0.3rem; border-radius: 3px; color: #FFFFFF; position: relative; animation: popIn 0.25s ease both; }
+		.kafka-ev small { display: block; font-size: 0.5rem; opacity: 0.8; font-weight: 500; }
+		.kafka-ev.read { opacity: 0.45; }
+		.saga-steps { display: grid; grid-template-columns: repeat(var(--n, 4), 1fr); gap: 0.5rem; margin: 0.6rem 0; }
+		.saga-step { font-size: 0.78rem; padding: 0.6rem; border-radius: 9px; border: 1.5px solid var(--border-strong); background: var(--bg-surface); text-align: center; transition: all 0.3s ease; }
+		.saga-step b { display: block; font-size: 0.8rem; margin-bottom: 0.2rem; }
+		.saga-step .st { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-muted); }
+		.saga-step.ok { border-color: var(--accent-pro); background: var(--accent-pro-soft); }
+		.saga-step.run { border-color: var(--accent-primary); background: var(--accent-primary-soft); box-shadow: 0 0 0 3px var(--accent-primary-soft); }
+		.saga-step.fail { border-color: var(--accent-danger); background: var(--accent-danger-soft); }
+		.saga-step.comp { border-color: var(--accent-warn); background: var(--accent-warn-soft); }
+		@media (max-width: 680px) { .saga-steps { grid-template-columns: 1fr 1fr; } .kafka-part { grid-template-columns: 70px 1fr; } }
+	</style>
+</head>
+<body>
+	<div class="reading-progress-bar" id="readingProgress"></div>
+
+	<div class="app-shell" id="appShell">
+		<aside class="sidebar" id="appSidebar">
+			<div class="brand-header">
+				<div class="brand-top-row">
+					<span class="brand-eyebrow">System Design · Desde la Raíz</span>
+					<button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Ocultar barra lateral (Atajo: [)" aria-label="Ocultar barra lateral">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9-3 3 3 3"/></svg>
+						<span>Ocultar</span>
+					</button>
+				</div>
+				<h1 class="brand-title">Arquitectura de Sistemas</h1>
+				<p class="brand-subtitle">Estudio progresivo y conectado: Fase 6 completa (Temas 6.1 a 6.3)</p>
+				<a class="prev-phase-link" href="arquitectura_sistemas_distribuidos.html">
+					<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+					<span>Volver a Fase 5 · Sistemas Distribuidos</span>
+				</a>
+			</div>
+
+			<div class="reader-controls" aria-label="Ajustes de lectura">
+				<div class="control-row">
+					<span class="control-label">Tema</span>
+					<div class="btn-group">
+						<button class="ctrl-btn active" id="btnThemeLight" onclick="setTheme('light')">
+							<svg class="ui-icon" style="width:13px;height:13px;" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+							Papel
+						</button>
+						<button class="ctrl-btn" id="btnThemeDark" onclick="setTheme('dark')">
+							<svg class="ui-icon" style="width:13px;height:13px;" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+							Noche
+						</button>
+					</div>
+				</div>
+				<div class="control-row">
+					<span class="control-label">Fuente</span>
+					<div class="btn-group">
+						<button class="ctrl-btn active" id="btnFontSans" onclick="setFont('sans')">Sans</button>
+						<button class="ctrl-btn" id="btnFontSerif" onclick="setFont('serif')">Serif</button>
+					</div>
+				</div>
+				<div class="control-row">
+					<span class="control-label">Tamaño</span>
+					<div class="btn-group">
+						<button class="ctrl-btn" onclick="changeFontSize(-1)">A-</button>
+						<button class="ctrl-btn" onclick="changeFontSize(0)">100%</button>
+						<button class="ctrl-btn" onclick="changeFontSize(1)">A+</button>
+					</div>
+				</div>
+			</div>
+
+			<div>
+				<div class="nav-section-title">Fase 6 · Comunicación Asíncrona</div>
+				<ul class="nav-list" id="mainNav">
+					<li class="nav-item"><a href="#paso-6-1" class="active"><span class="step-badge">6.1</span><span>Colas de Mensajes (FIFO, DLQ)</span></a></li>
+					<li class="nav-item"><a href="#paso-6-2"><span class="step-badge">6.2</span><span>Pub/Sub y Flujos de Eventos (Kafka)</span></a></li>
+					<li class="nav-item"><a href="#paso-6-3"><span class="step-badge">6.3</span><span>Eventos, CQRS y Sagas</span></a></li>
+				</ul>
+			</div>
+
+			<div>
+				<div class="nav-section-title">Mapa Completo (11 Fases)</div>
+				<ul class="roadmap-future-list">
+					<li><span><strong>F1.</strong> Fundamentos ✓</span><span>5 temas</span></li>
+					<li><span><strong>F2.</strong> Datos ✓</span><span>5 temas</span></li>
+					<li><span><strong>F3.</strong> Rendimiento ✓</span><span>3 temas</span></li>
+					<li><span><strong>F4.</strong> Escalar ✓</span><span>6 temas</span></li>
+					<li><span><strong>F5.</strong> Distribuidos ✓</span><span>6 temas</span></li>
+					<li style="border-left-color:var(--accent-primary); color:var(--accent-primary); font-weight:600;"><span><strong>F6.</strong> Comunicación Asíncrona</span><span>3 temas</span></li>
+					<li><span><strong>F7.</strong> Arq. de Aplicaciones</span><span>8 temas</span></li>
+					<li><span><strong>F8.</strong> Búsqueda y Datos Esp.</span><span>5 temas</span></li>
+					<li><span><strong>F9.</strong> Resiliencia y Ops</span><span>7 temas</span></li>
+					<li><span><strong>F10.</strong> 26 Casos Reales</span><span>26 casos</span></li>
+					<li><span><strong>F11.</strong> Framework Entrevista</span><span>3 temas</span></li>
+				</ul>
+			</div>
+		</aside>
+
+		<main class="main-content">
+			<header class="hero-header">
+				<span class="hero-kicker">Guía de Estudio Profundo · Fase 6 · Método Acumulativo</span>
+				<h2 class="hero-title">Comunicación Asíncrona: Responder Ya, Trabajar Después</h2>
+				<p class="hero-lead">
+					En la Fase 5, varias soluciones terminaban en "usa una cola": procesar cada pedido una sola vez (5.6), no dejar que un servicio lento tumbe a otro (5.2), y reemplazar las transacciones distribuidas con sagas. Esta fase abre esa caja: <strong>colas de trabajo con reintentos y dead-letter queues</strong> (6.1), <strong>logs de eventos como Kafka</strong> donde muchos servicios escuchan lo mismo y se puede "rebobinar" (6.2), y los patrones para construir sistemas enteros sobre eventos: <strong>sagas, CQRS y outbox</strong> (6.3). Vuelven la Ley de Little de <a href="arquitectura_sistemas_fundamentos.html#paso-1-5" class="memory-pill">1.5</a>, el WAL de <a href="arquitectura_sistemas_datos_almacenamiento.html#paso-2-1" class="memory-pill">2.1</a>, el particionado de <a href="arquitectura_sistemas_escalar.html#paso-4-4" class="memory-pill">4.4</a> y la idempotencia de <a href="arquitectura_sistemas_distribuidos.html#paso-5-2" class="memory-pill">5.2</a>.
+				</p>
+			</header>
+
+			<section class="progressive-chain-card" aria-label="Hilo conductor de la Fase 6">
+				<div class="chain-title">
+					<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+					<span>El Hilo Conductor: Por qué el orden 6.1 → 6.3 es inquebrantable</span>
+				</div>
+				<div class="chain-steps three">
+					<a href="#paso-6-1" class="chain-node"><span class="chain-node-num">PASO Z · 6.1</span><span class="chain-node-name">El Buzón</span><span class="chain-node-desc">Colas de trabajo, ACK, visibility timeout, DLQ, garantías de entrega y backpressure.</span></a>
+					<a href="#paso-6-2" class="chain-node"><span class="chain-node-num">PASO AA · 6.2</span><span class="chain-node-name">El Periódico</span><span class="chain-node-desc">Pub/sub, el log de Kafka, particiones, offsets y consumer groups.</span></a>
+					<a href="#paso-6-3" class="chain-node"><span class="chain-node-num">PASO AB · 6.3</span><span class="chain-node-name">Sistemas Hechos de Eventos</span><span class="chain-node-desc">Sagas con compensación, CQRS, outbox y event sourcing.</span></a>
+				</div>
+			</section>
+
+			<!-- ================================================================= -->
+			<!-- PASO 6.1: COLAS DE MENSAJES                                       -->
+			<!-- ================================================================= -->
+			<article class="topic-chapter" id="paso-6-1">
+				<div class="chapter-meta">
+					<span class="chapter-badge">PASO 6.1 · CIMIENTO Z</span>
+					<span class="chapter-tag">Prerrequisitos: 1.5 (Ley de Little) + 5.2 (Reintentos, idempotencia) + 5.4 (¿Muerto o lento?)</span>
+					<span class="chapter-tag">Desbloquea: 6.2, 9.1 Backpressure, 10.4 Notificaciones, 10.21 Job Scheduler</span>
+				</div>
+				<h2 class="chapter-title">Colas de Mensajes (FIFO, DLQ)</h2>
+				<p class="chapter-subtitle">
+					Una cola separa "pedir" de "hacer". La API acepta el trabajo en milisegundos y unos workers lo ejecutan a su ritmo. Esa separación absorbe picos, aísla fallas y escala por separado, pero trae sus propias preguntas: ¿qué pasa si un worker muere a la mitad?, ¿y si un mensaje nunca se puede procesar?, ¿llega cada mensaje exactamente una vez?
+				</p>
+				<div class="memory-bridge">
+					<div class="memory-bridge-header">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+						<span>Conexión Progresiva</span>
+					</div>
+					<p>1. En <a href="arquitectura_sistemas_fundamentos.html#paso-1-5" class="memory-pill">1.5 (L = λ · W)</a>: si cada compra retiene un hilo 8 segundos, necesitas 200 veces más hilos que si lo retiene 35 ms. La cola reduce W.</p>
+					<p>2. En <a href="arquitectura_sistemas_distribuidos.html#paso-5-2" class="memory-pill">5.2 (Idempotencia)</a> aprendiste que reintentar es seguro solo si repetir no daña. Las colas reintentan por diseño.</p>
+					<p>3. En <a href="arquitectura_sistemas_distribuidos.html#paso-5-4" class="memory-pill">5.4 (¿Muerto o lento?)</a>: el broker tampoco sabe si un worker murió o va lento. El visibility timeout es su forma de sospechar.</p>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.1.1</span> El Desacoplamiento Temporal: El Buzón de la Esquina</h3>
+				<p>Un checkout síncrono hace todo dentro de la misma petición: guardar la orden (20 ms), cobrar (800 ms), generar el PDF de la factura (3.5 s), mandar el correo (2.2 s) y un SMS (1.1 s). Casi <strong>8 segundos</strong> con el usuario esperando y un hilo bloqueado. Con 500 compras simultáneas en una promoción, los hilos se agotan y el sitio cae.</p>
+				<div class="callout analogy">
+					<div class="callout-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+						<span>La Carta para tu Abuela</span>
+					</div>
+					<p style="margin-bottom:0;">No te quedas en la banqueta esperando a que el cartero llegue, maneje a otra ciudad y tu abuela termine de leer. <strong>Echas la carta al buzón y sigues con tu día.</strong> El correo (la cola) la guarda y un cartero (un worker) la entrega a su ritmo.</p>
+				</div>
+				<div class="diagram-card">
+					<div class="diagram-header"><span>Figura 6.1A · Lo Urgente en la Petición, lo Lento en la Cola</span><span>Animado</span></div>
+					<div class="diagram-svg-wrap">
+						<svg viewBox="0 0 840 250" width="100%" style="max-width: 820px; height: auto;" role="img" aria-label="La API guarda la orden, encola tareas y responde rápido; los workers procesan después">
+							<rect x="15" y="100" width="100" height="50" rx="9" fill="var(--accent-primary-soft)" stroke="var(--accent-primary)" stroke-width="1.6"/>
+							<text x="65" y="129" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="10.5" font-weight="700" fill="var(--text-primary)">Cliente</text>
+							<rect x="170" y="95" width="130" height="60" rx="9" fill="var(--accent-memory-soft)" stroke="var(--accent-memory)" stroke-width="1.6"/>
+							<text x="235" y="120" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="10.5" font-weight="700" fill="var(--text-primary)">API (productor)</text>
+							<text x="235" y="138" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="var(--accent-memory)">202 en 35 ms</text>
+							<rect x="170" y="190" width="130" height="44" rx="8" fill="var(--accent-warn-soft)" stroke="var(--accent-warn)" stroke-width="1.4"/>
+							<text x="235" y="216" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="10" font-weight="700" fill="var(--text-primary)">BD: orden (20 ms)</text>
+							<rect x="360" y="95" width="200" height="60" rx="9" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.6"/>
+							<text x="460" y="88" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="10.5" font-weight="700" fill="var(--text-primary)">COLA (SQS / RabbitMQ)</text>
+							<g font-family="JetBrains Mono, monospace" font-size="8.5" font-weight="700">
+								<rect x="372" y="112" width="40" height="26" rx="4" fill="var(--accent-primary-soft)" stroke="var(--accent-primary)"/><text x="392" y="129" text-anchor="middle" fill="var(--accent-primary)">pdf</text>
+								<rect x="418" y="112" width="40" height="26" rx="4" fill="var(--accent-primary-soft)" stroke="var(--accent-primary)"/><text x="438" y="129" text-anchor="middle" fill="var(--accent-primary)">mail</text>
+								<rect x="464" y="112" width="40" height="26" rx="4" fill="var(--accent-primary-soft)" stroke="var(--accent-primary)"/><text x="484" y="129" text-anchor="middle" fill="var(--accent-primary)">sms</text>
+								<rect x="510" y="112" width="40" height="26" rx="4" fill="var(--accent-danger-soft)" stroke="var(--accent-danger)"/><text x="530" y="129" text-anchor="middle" fill="var(--accent-danger)">☠</text>
+							</g>
+							<g font-family="Plus Jakarta Sans, sans-serif" text-anchor="middle" font-size="10" font-weight="700">
+								<rect x="630" y="20" width="190" height="44" rx="8" fill="var(--accent-pro-soft)" stroke="var(--accent-pro)"/><text x="725" y="47" fill="var(--text-primary)">Worker PDF (3.5 s)</text>
+								<rect x="630" y="75" width="190" height="44" rx="8" fill="var(--accent-pro-soft)" stroke="var(--accent-pro)"/><text x="725" y="102" fill="var(--text-primary)">Worker correo (2.2 s)</text>
+								<rect x="630" y="130" width="190" height="44" rx="8" fill="var(--accent-pro-soft)" stroke="var(--accent-pro)"/><text x="725" y="157" fill="var(--text-primary)">Worker SMS (1.1 s)</text>
+								<rect x="630" y="190" width="190" height="44" rx="8" fill="var(--accent-danger-soft)" stroke="var(--accent-danger)"/><text x="725" y="211" fill="var(--accent-danger)">DLQ</text><text x="725" y="226" font-size="8.5" font-weight="400" fill="var(--text-muted)">mensajes que fallaron 3 veces</text>
+							</g>
+							<g stroke="var(--border-strong)" stroke-dasharray="4 4" fill="none"><path d="M 115 125 L 170 125"/><path d="M 235 155 L 235 190"/><path d="M 300 125 L 360 125"/><path d="M 560 115 L 630 42"/><path d="M 560 122 L 630 97"/><path d="M 560 130 L 630 152"/><path d="M 560 140 L 630 212"/></g>
+							<circle r="5" fill="var(--accent-primary)"><animateMotion dur="2s" repeatCount="indefinite" path="M 115 125 L 170 125"/></circle>
+							<circle r="5" fill="var(--accent-pro)"><animateMotion dur="2s" begin="0.4s" repeatCount="indefinite" path="M 170 135 L 115 135"/></circle>
+							<circle r="5" fill="var(--accent-primary)"><animateMotion dur="2.5s" repeatCount="indefinite" path="M 560 115 L 630 42"/></circle>
+							<circle r="5" fill="var(--accent-primary)"><animateMotion dur="2.5s" begin="0.8s" repeatCount="indefinite" path="M 560 122 L 630 97"/></circle>
+							<circle r="5" fill="var(--accent-primary)"><animateMotion dur="2.5s" begin="1.6s" repeatCount="indefinite" path="M 560 130 L 630 152"/></circle>
+							<circle r="5" fill="var(--accent-danger)"><animateMotion dur="3.5s" begin="1s" repeatCount="indefinite" path="M 560 140 L 630 212"/></circle>
+						</svg>
+					</div>
+					<div class="diagram-caption">El cliente recibe <code>202 Accepted</code> con un ID de seguimiento en 35 ms. El PDF, el correo y el SMS se hacen después, en paralelo, sin bloquear a nadie.</div>
+				</div>
+
+				<!-- LAB 6.1A -->
+				<div class="interactive-lab" id="lab-6-1a">
+					<div class="lab-header">
+						<div>
+							<span class="lab-badge"><svg class="ui-icon" style="width:12px;height:12px;margin-right:0.25rem;" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>Laboratorio Interactivo 6.1A</span>
+							<div class="lab-title" style="margin-top:0.35rem;">Checkout Síncrono vs. con Cola: ¿Cuántos Hilos Necesita la API?</div>
+						</div>
+					</div>
+					<div class="slider-group">
+						<div class="slider-item"><div class="slider-top"><span>Compras por segundo (pico)</span><span id="syQVal">60</span></div><input type="range" id="syQ" min="5" max="500" step="5" value="60" oninput="recalcSync()"></div>
+					</div>
+					<div class="lab-stage" id="syStage"></div>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.1.2</span> Las Tres Piezas: Productor, Broker y Workers</h3>
+				<ul>
+					<li><strong>Productor:</strong> el servicio que recibe la petición, crea un mensaje pequeño (<code>{"order_id": 1042}</code>, no el PDF entero) y lo encola.</li>
+					<li><strong>Broker (la cola):</strong> lo guarda de forma durable hasta que alguien lo procese: <strong>RabbitMQ</strong>, <strong>AWS SQS</strong>, <strong>Redis Streams</strong>, <strong>BullMQ</strong>, Google Pub/Sub.</li>
+					<li><strong>Workers:</strong> procesos aparte que toman mensajes, hacen el trabajo pesado y avisan que terminaron (ACK). Varios workers compiten por los mensajes de la misma cola: cada mensaje lo procesa uno.</li>
+				</ul>
+
+				<h3 class="section-heading"><span class="sec-num">6.1.3</span> Cuando un Worker Muere a la Mitad: Visibility Timeout, Reintentos y DLQ</h3>
+				<ol>
+					<li><strong>Visibility timeout:</strong> cuando un worker toma un mensaje, el broker no lo borra: lo vuelve <strong>invisible</strong> por un tiempo (ej. 30 s). Si llega el <strong>ACK</strong>, se borra. Si el worker muere y pasan los 30 s sin ACK, el mensaje reaparece y otro worker lo toma.</li>
+					<li><strong>Mensaje venenoso (poison pill):</strong> un mensaje que hace fallar a cualquier worker (un PDF corrupto). Sin límite, se reintenta para siempre y va tumbando workers uno por uno.</li>
+					<li><strong>Dead Letter Queue (DLQ):</strong> tras N intentos fallidos (ej. 3, contados en <code>delivery_count</code>), el broker lo manda a una cola aparte. La cola principal sigue sana, se dispara una alerta y alguien revisa la DLQ con calma, corrige el bug y re-encola.</li>
+				</ol>
+
+				<!-- LAB 6.1B -->
+				<div class="interactive-lab" id="lab-6-1b">
+					<div class="lab-header">
+						<div>
+							<span class="lab-badge"><svg class="ui-icon" style="width:12px;height:12px;margin-right:0.25rem;" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Laboratorio Interactivo 6.1B</span>
+							<div class="lab-title" style="margin-top:0.35rem;">Simulador de Cola: Workers, Visibility Timeout, Poison Pills y DLQ</div>
+						</div>
+					</div>
+					<p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:0.7rem;">Cada tick llegan mensajes y cada worker procesa uno en 3 ticks. Ajusta productores y workers para ver crecer o vaciarse la cola (backpressure). Inyecta un mensaje venenoso o mata a un worker a la mitad. Visibility timeout: 5 ticks · DLQ tras 3 intentos.</p>
+					<div class="slider-group">
+						<div class="slider-item"><div class="slider-top"><span>Mensajes por tick</span><span id="qsInVal">1</span></div><input type="range" id="qsIn" min="0" max="4" step="1" value="1" oninput="document.getElementById('qsInVal').textContent=this.value"></div>
+						<div class="slider-item"><div class="slider-top"><span>Workers</span><span id="qsWVal">3</span></div><input type="range" id="qsW" min="1" max="8" step="1" value="3" oninput="qsSetWorkers()"></div>
+					</div>
+					<div class="lab-controls">
+						<button class="lab-btn primary-action" id="qsRun" onclick="qsToggle()">⏸ Pausar</button>
+						<button class="lab-btn danger-btn" onclick="qsPoison()">☠ Inyectar mensaje venenoso</button>
+						<button class="lab-btn danger-btn" onclick="qsKill()">💥 Matar al worker 1 a la mitad</button>
+					</div>
+					<div class="lab-stage">
+						<div class="metric-label" style="margin-bottom:0.3rem;">COLA (visibles · <span style="opacity:0.6;">invisibles = en vuelo</span>)</div>
+						<div class="queue-lane" id="qsQueue"></div>
+						<div class="worker-row" id="qsWorkers"></div>
+						<div class="metric-label" style="margin-bottom:0.3rem;">DEAD LETTER QUEUE</div>
+						<div class="queue-lane" id="qsDlq" style="border-color:var(--accent-danger);"></div>
+						<div class="metric-pills">
+							<div class="metric-card"><span class="metric-label">Profundidad de la cola</span><span class="metric-val" id="qsDepth">0</span></div>
+							<div class="metric-card"><span class="metric-label">Procesados (ACK)</span><span class="metric-val" id="qsDone" style="color:var(--accent-pro);">0</span></div>
+							<div class="metric-card"><span class="metric-label">Re-entregas</span><span class="metric-val" id="qsRe" style="color:var(--accent-warn);">0</span></div>
+						</div>
+						<div class="wal-log" id="qsLog" style="min-height:60px;"></div>
+					</div>
+				</div>
+				<div class="callout tradeoff">
+					<div class="callout-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+						<span>Backpressure: Cuando Entra Más de lo que Sale</span>
+					</div>
+					<p style="margin-bottom:0;">Si llegan 10,000 tareas/s y los workers procesan 2,000, la cola crece sin límite (<em>queue lag</em>) y cada mensaje espera más. Opciones: <strong>autoescalar workers por profundidad de cola</strong> (KEDA o HPA en Kubernetes), <strong>frenar la entrada</strong> (rechazar o limitar al productor, 7.3, 9.1) o aceptar el retraso si el negocio lo tolera. Métrica clave: la <strong>edad del mensaje más viejo</strong>, no solo cuántos hay.</p>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.1.4</span> Garantías de Entrega: El Mito del "Exactly-Once"</h3>
+				<div class="table-wrapper">
+					<table>
+						<thead><tr><th>Garantía</th><th>Cómo funciona</th><th>Riesgo</th><th>Úsala para</th></tr></thead>
+						<tbody>
+							<tr><td><strong>At-most-once</strong> (a lo más una vez)</td><td>El broker borra el mensaje al entregarlo, sin esperar ACK</td><td><span class="cell-bad">Pérdida</span> si el worker muere</td><td>Métricas y telemetría prescindibles</td></tr>
+							<tr><td><strong>At-least-once</strong> (al menos una vez)</td><td>Se borra solo tras el ACK; si no llega, se re-entrega</td><td><span class="cell-warn" style="color:var(--accent-warn); font-weight:700;">Duplicados</span> si el ACK se pierde</td><td>Casi todo (es el estándar)</td></tr>
+							<tr><td><strong>Effectively-once</strong></td><td>At-least-once + <strong>deduplicación idempotente</strong> en el worker</td><td>Ninguno, si la dedup es atómica</td><td>Pagos, correos, todo lo que no se debe repetir</td></tr>
+						</tbody>
+					</table>
+				</div>
+				<p>Entregar exactamente una vez por la red es imposible por el problema de los dos generales (5.2). Lo que sí se puede es que el <strong>efecto</strong> ocurra una vez: entrega al menos una vez y haz al consumidor idempotente.</p>
+
+				<!-- LAB 6.1C -->
+				<div class="interactive-lab" id="lab-6-1c">
+					<div class="lab-header">
+						<div>
+							<span class="lab-badge"><svg class="ui-icon" style="width:12px;height:12px;margin-right:0.25rem;" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 6 12 13 2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>Laboratorio Interactivo 6.1C</span>
+							<div class="lab-title" style="margin-top:0.35rem;">El ACK se Pierde: ¿Cuántos Correos Recibe el Cliente?</div>
+						</div>
+					</div>
+					<p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:0.7rem;">El worker manda el correo de confirmación y su ACK se pierde; el broker re-entrega. O el worker muere antes de mandar el correo. Compara las garantías:</p>
+					<div class="lab-controls">
+						<button class="lab-btn active" id="dgBtn_amo" onclick="setDg('amo')">At-most-once</button>
+						<button class="lab-btn" id="dgBtn_alo" onclick="setDg('alo')">At-least-once</button>
+						<button class="lab-btn" id="dgBtn_eo" onclick="setDg('eo')">Effectively-once (dedup)</button>
+					</div>
+					<div class="lab-controls">
+						<button class="lab-btn primary-action" onclick="runDg('ack')">▶ Escenario 1: el ACK se pierde</button>
+						<button class="lab-btn primary-action" onclick="runDg('crash')">▶ Escenario 2: el worker muere antes de enviar</button>
+					</div>
+					<div class="lab-stage">
+						<div class="tx-timeline" id="dgTl" style="grid-template-columns: 34px 1fr 1fr 1fr;"></div>
+						<div class="verdict-box" id="dgOut">Elige una garantía y un escenario.</div>
+					</div>
+				</div>
+<pre><code>def procesar(mensaje):
+    # Dedup atómica: si el INSERT choca con la PK, ya lo procesamos antes
+    with db.transaction():
+        nuevo = db.execute(
+            "INSERT INTO processed_messages (message_id) VALUES (%s) ON CONFLICT DO NOTHING",
+            mensaje.id).rowcount
+        if nuevo == 0:
+            return ack(mensaje)              # duplicado: confirmar y no repetir el efecto
+        enviar_correo(mensaje.order_id)       # efecto (idealmente también idempotente en el proveedor)
+        db.execute("UPDATE orders SET email_sent = true WHERE id = %s", mensaje.order_id)
+    ack(mensaje)                              # el ACK va AL FINAL, tras el efecto confirmado</code></pre>
+
+				<h3 class="section-heading"><span class="sec-num">6.1.5</span> Orden, Prioridades y Colas FIFO</h3>
+				<p>Con 5 workers en la misma cola, el worker 2 puede terminar el mensaje 2 antes de que el worker 1 termine el 1. Si "Cancelar pedido" se procesa antes que "Crear pedido", hay un problema. Si necesitas orden <strong>por entidad</strong> (por cliente, por pedido), usa una cola FIFO con <strong>grupos</strong> (<code>MessageGroupId</code> en SQS FIFO): orden estricto dentro de cada grupo y paralelismo entre grupos. O un log particionado (6.2). Para prioridades (clientes premium primero), los brokers usan un <strong>heap</strong> (O(log N)) o colas separadas por prioridad.</p>
+				<div class="table-wrapper">
+					<table>
+						<thead><tr><th>Si eliges ganar...</th><th>Estás aceptando pagar el costo de...</th></tr></thead>
+						<tbody>
+							<tr><td><strong>Respuestas en ~50 ms, absorber picos y aislar fallas con una cola</strong></td><td>Consistencia eventual (el PDF no está al instante: hay que avisar con polling, WebSocket o push) y operar el broker y vigilar su profundidad.</td></tr>
+							<tr><td><strong>Simplicidad síncrona</strong></td><td>Cualquier lentitud externa tumba tu API; escalar es caro.</td></tr>
+						</tbody>
+					</table>
+				</div>
+				<div class="vs-grid">
+					<div class="vs-card novice">
+						<span class="vs-badge"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> Forma Novata</span>
+						<p style="font-size:0.88rem; margin-bottom:0;"><code>await enviarEmail(); await procesarImagen(); res.send('OK')</code> dentro del controlador. 500 registros a la vez: la RAM se agota, el servidor se congela 40 s y los clientes reintentan furiosos.</p>
+					</div>
+					<div class="vs-card pro">
+						<span class="vs-badge"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Versión Pro (Senior / Staff)</span>
+						<p style="font-size:0.88rem; margin-bottom:0;">La API valida, guarda y encola (con outbox, 6.3); responde 202 con un ID. Workers idempotentes, visibility timeout mayor que el p99 del trabajo (o extendido con heartbeats), DLQ con alertas, autoescalado por edad del mensaje más viejo.</p>
+					</div>
+				</div>
+				<div class="callout danger">
+					<div class="callout-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+						<span>Errores Comunes y Gotchas</span>
+					</div>
+					<ol style="margin-bottom:0;">
+						<li><strong>Asumir orden estricto</strong> con varios workers en paralelo.</li>
+						<li><strong>Visibility timeout menor que el trabajo:</strong> un video de 45 s con timeout de 30 s se procesa dos veces (o más).</li>
+						<li><strong>ACK antes de terminar:</strong> si el worker muere después del ACK, el trabajo se pierde (sin querer, at-most-once).</li>
+						<li><strong>Mensajes gigantes:</strong> mete el ID y una referencia (S3, 3.2), no el archivo.</li>
+						<li><strong>DLQ sin alerta ni dueño:</strong> se llena en silencio durante meses.</li>
+					</ol>
+				</div>
+				<div class="personal-notes-card">
+					<div class="personal-notes-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+						<span>Ficha de Repaso para tu Cuaderno</span>
+					</div>
+					<p style="font-size:0.9rem; margin-bottom:0;">Cola = separar "pedir" de "hacer": la API responde <strong>202</strong> en ms y los <strong>workers</strong> trabajan después. Un mensaje tomado queda <strong>invisible</strong>; con <strong>ACK</strong> se borra, sin ACK reaparece. Tras N fallos va a la <strong>DLQ</strong>. Garantía práctica: <strong>at-least-once + consumidor idempotente</strong> = efecto una sola vez. Orden por entidad con grupos FIFO. Vigila la profundidad y la edad del mensaje más viejo (<strong>backpressure</strong>).</p>
+				</div>
+				<div class="mastery-box">
+					<h4 style="font-family:var(--font-sans); font-size:1rem; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.45rem;">
+						<svg class="ui-icon" style="color:var(--accent-primary);" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+						<span>Autoevaluación de Raíz 6.1 (Antes de pasar al 6.2)</span>
+					</h4>
+					<p style="font-size:0.92rem; margin-bottom:0.5rem;"><strong>Pregunta 1:</strong> Un worker se apaga por un corte de luz a la mitad de procesar un mensaje. ¿Qué pasa, y cómo se evita perderlo o reintentarlo infinitamente?</p>
+					<details class="solution-reveal">
+						<summary>Ver respuesta razonada paso a paso</summary>
+						<div class="solution-body">
+							<p style="margin-bottom:0;">El broker no había borrado el mensaje: solo lo hizo invisible por el visibility timeout (ej. 60 s). El worker muerto nunca manda el ACK, así que a los 60 s el mensaje vuelve a ser visible y otro worker lo toma (no se pierde). Cada entrega incrementa <code>delivery_count</code>; si el mensaje es venenoso y llega a 3 fallos, el broker lo manda a la <strong>DLQ</strong> y dispara una alerta, en lugar de reintentarlo para siempre. Como hubo re-entrega, el worker debe ser idempotente por si el primero alcanzó a producir efectos.</p>
+						</div>
+					</details>
+					<p style="font-size:0.92rem; margin:1.1rem 0 0.5rem;"><strong>Pregunta 2:</strong> Llegan 1,200 tareas/s y cada worker procesa una en 250 ms. ¿Cuántos workers necesitas como mínimo y con margen?</p>
+					<details class="solution-reveal">
+						<summary>Ver respuesta razonada paso a paso</summary>
+						<div class="solution-body">
+							<p style="margin-bottom:0;">Ley de Little: tareas en proceso = λ · W = 1,200 × 0.25 = <strong>300 workers ocupados</strong> en promedio (o 300 "hilos" de procesamiento). Al 100% de uso, la cola crece ante cualquier pico; apuntando a ~70%: 300 / 0.7 ≈ <strong>430</strong>. Si cada proceso maneja 10 tareas concurrentes (I/O), son ~43 procesos. Y se autoescala por la edad del mensaje más viejo.</p>
+						</div>
+					</details>
+				</div>
+			</article>
+
+			<!-- ================================================================= -->
+			<!-- PASO 6.2: PUB/SUB Y KAFKA                                         -->
+			<!-- ================================================================= -->
+			<article class="topic-chapter" id="paso-6-2">
+				<div class="chapter-meta">
+					<span class="chapter-badge">PASO 6.2 · CIMIENTO AA</span>
+					<span class="chapter-tag">Prerrequisitos: 6.1 + 2.1 (WAL) + 4.4 (Particiones) + 4.3 (Replicación)</span>
+					<span class="chapter-tag">Desbloquea: 6.3, 8.4 Pipelines, 10.18 Clics de anuncios</span>
+				</div>
+				<h2 class="chapter-title">Pub/Sub y Flujos de Eventos (Kafka)</h2>
+				<p class="chapter-subtitle">
+					En una cola, cada mensaje lo consume un solo worker y luego desaparece. Pero cuando ocurre algo importante ("se creó la orden 501"), varios servicios quieren enterarse: pagos, inventario, notificaciones, analítica. Kafka lo resuelve tratando los mensajes como un <strong>log que no se borra al leerse</strong>.
+				</p>
+				<div class="memory-bridge">
+					<div class="memory-bridge-header">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+						<span>Conexión Progresiva</span>
+					</div>
+					<p>1. En <a href="arquitectura_sistemas_datos_almacenamiento.html#paso-2-1" class="memory-pill">2.1 (WAL)</a> y <a href="arquitectura_sistemas_datos_almacenamiento.html#paso-2-3" class="memory-pill">2.3 (LSM)</a>: escribir al final de un archivo es rapidísimo. Kafka es eso, convertido en servicio.</p>
+					<p>2. En <a href="arquitectura_sistemas_escalar.html#paso-4-4" class="memory-pill">4.4 (Sharding)</a>: un tópico se parte en particiones con <code>hash(clave) % N</code>, y tiene los mismos hotspots (4.6).</p>
+					<p>3. En <a href="arquitectura_sistemas_distribuidos.html#paso-5-6" class="memory-pill">5.6 (Una partición, un consumidor)</a> era la forma de procesar sin lock distribuido. Aquí ves cómo funciona.</p>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.2.1</span> De la Cola 1-a-1 al Pub/Sub 1-a-Muchos</h3>
+				<div class="callout analogy">
+					<div class="callout-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+						<span>La Carta Sellada vs. el Periódico</span>
+					</div>
+					<p style="margin-bottom:0;"><strong>Cola:</strong> le das una carta sellada a <em>un</em> mensajero; cuando la entrega, ya no existe. <strong>Pub/Sub:</strong> publicas un titular en el periódico; miles lo leen, cada uno a su hora y por su lado, y el periódico sigue en la hemeroteca para quien llegue después.</p>
+				</div>
+				<div class="diagram-card">
+					<div class="diagram-header"><span>Figura 6.2A · Cola (compiten por el mensaje) vs. Pub/Sub (cada grupo recibe su copia)</span><span>Animado</span></div>
+					<div class="diagram-svg-wrap">
+						<svg viewBox="0 0 840 220" width="100%" style="max-width: 820px; height: auto;" role="img" aria-label="En la cola un mensaje va a un solo worker; en pub/sub el mismo evento llega a varios servicios">
+							<text x="200" y="20" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="11.5" font-weight="700" fill="var(--text-primary)">COLA: cada mensaje → UN worker</text>
+							<rect x="30" y="90" width="110" height="44" rx="8" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5"/><text x="85" y="117" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="10" font-weight="700" fill="var(--text-primary)">Cola</text>
+							<g font-family="Plus Jakarta Sans, sans-serif" font-size="10" text-anchor="middle" font-weight="700">
+								<rect x="270" y="40" width="110" height="36" rx="7" fill="var(--accent-pro-soft)" stroke="var(--accent-pro)"/><text x="325" y="63" fill="var(--text-primary)">Worker 1</text>
+								<rect x="270" y="94" width="110" height="36" rx="7" fill="var(--accent-pro-soft)" stroke="var(--accent-pro)"/><text x="325" y="117" fill="var(--text-primary)">Worker 2</text>
+								<rect x="270" y="148" width="110" height="36" rx="7" fill="var(--accent-pro-soft)" stroke="var(--accent-pro)"/><text x="325" y="171" fill="var(--text-primary)">Worker 3</text>
+							</g>
+							<circle r="6" fill="var(--accent-primary)"><animateMotion dur="3s" repeatCount="indefinite" path="M 140 112 L 270 58"/></circle>
+							<circle r="6" fill="var(--accent-warn)"><animateMotion dur="3s" begin="1s" repeatCount="indefinite" path="M 140 112 L 270 112"/></circle>
+							<circle r="6" fill="var(--accent-memory)"><animateMotion dur="3s" begin="2s" repeatCount="indefinite" path="M 140 112 L 270 166"/></circle>
+							<text x="200" y="210" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="9.5" fill="var(--text-muted)">Tres mensajes distintos, uno a cada worker; se borran al procesarse</text>
+							<line x1="420" y1="10" x2="420" y2="210" stroke="var(--border-subtle)" stroke-dasharray="4 4"/>
+							<text x="630" y="20" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="11.5" font-weight="700" fill="var(--text-primary)">PUB/SUB: cada evento → TODOS los grupos</text>
+							<rect x="450" y="90" width="110" height="44" rx="8" fill="var(--accent-memory-soft)" stroke="var(--accent-memory)" stroke-width="1.5"/><text x="505" y="111" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="10" font-weight="700" fill="var(--text-primary)">Tópico</text><text x="505" y="125" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8.5" fill="var(--accent-memory)">OrderCreated</text>
+							<g font-family="Plus Jakarta Sans, sans-serif" font-size="10" text-anchor="middle" font-weight="700">
+								<rect x="690" y="30" width="130" height="34" rx="7" fill="var(--accent-warn-soft)" stroke="var(--accent-warn)"/><text x="755" y="52" fill="var(--text-primary)">Pagos</text>
+								<rect x="690" y="74" width="130" height="34" rx="7" fill="var(--accent-warn-soft)" stroke="var(--accent-warn)"/><text x="755" y="96" fill="var(--text-primary)">Inventario</text>
+								<rect x="690" y="118" width="130" height="34" rx="7" fill="var(--accent-warn-soft)" stroke="var(--accent-warn)"/><text x="755" y="140" fill="var(--text-primary)">Notificaciones</text>
+								<rect x="690" y="162" width="130" height="34" rx="7" fill="var(--accent-warn-soft)" stroke="var(--accent-warn)"/><text x="755" y="184" fill="var(--text-primary)">Analítica</text>
+							</g>
+							<circle r="5" fill="var(--accent-primary)"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 560 112 L 690 47"/></circle>
+							<circle r="5" fill="var(--accent-primary)"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 560 112 L 690 91"/></circle>
+							<circle r="5" fill="var(--accent-primary)"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 560 112 L 690 135"/></circle>
+							<circle r="5" fill="var(--accent-primary)"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 560 112 L 690 179"/></circle>
+							<text x="630" y="210" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="9.5" fill="var(--text-muted)">El mismo evento llega a los cuatro; el productor ni sabe quiénes son</text>
+						</svg>
+					</div>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.2.2</span> Kafka: Un Log Particionado, Replicado y que No Olvida</h3>
+				<ul>
+					<li><strong>Los eventos no se borran al leerse:</strong> se guardan en disco (secuencial, rapidísimo) por días, meses o para siempre, según la retención.</li>
+					<li><strong>Offset:</strong> cada consumidor solo guarda un número: "voy en el evento 1,042 de la partición 2".</li>
+					<li><strong>Rebobinar:</strong> si el servicio de impuestos tuvo un bug 48 horas, lo corriges, mueves su offset dos días atrás y reprocesas todo, sin tocar a nadie más.</li>
+					<li><strong>Particiones:</strong> un tópico se divide en particiones repartidas entre brokers (y replicadas, 4.3). El productor manda una <strong>clave</strong>, y <code>hash(clave) % particiones</code> decide a cuál va.</li>
+					<li><strong>La ley del orden:</strong> Kafka garantiza orden <strong>solo dentro de una partición</strong>. Por eso todos los eventos de un mismo cliente deben llevar la misma clave (<code>customer_id</code>): caen en la misma partición y se leen en orden.</li>
+					<li><strong>Consumer groups:</strong> cada partición se asigna a <strong>un solo consumidor dentro de cada grupo</strong>. Más consumidores que particiones = consumidores ociosos.</li>
+				</ul>
+
+				<!-- LAB 6.2A -->
+				<div class="interactive-lab" id="lab-6-2a">
+					<div class="lab-header">
+						<div>
+							<span class="lab-badge"><svg class="ui-icon" style="width:12px;height:12px;margin-right:0.25rem;" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>Laboratorio Interactivo 6.2A</span>
+							<div class="lab-title" style="margin-top:0.35rem;">Playground de Kafka: Claves, Particiones, Offsets y Consumer Groups</div>
+						</div>
+					</div>
+					<p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:0.7rem;">Tópico <code>orders</code> con 3 particiones. Cada usuario tiene un color. Publica la secuencia <em>Creada → Pagada → Enviada</em> de un usuario con y sin clave. Mueve los consumidores del grupo "envíos" y rebobina al grupo "analítica".</p>
+					<div class="lab-controls">
+						<button class="lab-btn primary-action" onclick="kfFlow(true)">▶ Publicar flujo de 3 eventos CON clave = usuario</button>
+						<button class="lab-btn danger-btn" onclick="kfFlow(false)">▶ Publicar flujo SIN clave (round robin)</button>
+						<button class="lab-btn" onclick="kfReset()">↺ Vaciar</button>
+					</div>
+					<div class="slider-group">
+						<div class="slider-item"><div class="slider-top"><span>Consumidores en el grupo "envíos"</span><span id="kfCVal">2</span></div><input type="range" id="kfC" min="1" max="5" step="1" value="2" oninput="kfRender()"></div>
+					</div>
+					<div class="lab-controls">
+						<button class="lab-btn" onclick="kfConsume()">⏵ El grupo "envíos" consume lo pendiente</button>
+						<button class="lab-btn" onclick="kfRewind()">⏪ Rebobinar "analítica" al offset 0</button>
+					</div>
+					<div class="lab-stage">
+						<div id="kfParts"></div>
+						<div id="kfGroups" style="margin-top:0.6rem;"></div>
+						<div class="wal-log" id="kfLog" style="min-height:60px;"></div>
+					</div>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.2.3</span> Cola Tradicional vs. Log de Eventos</h3>
+				<div class="table-wrapper">
+					<table>
+						<thead><tr><th>Dimensión</th><th>RabbitMQ / SQS</th><th>Kafka (y Kinesis, Pulsar, Redpanda)</th></tr></thead>
+						<tbody>
+							<tr><td><strong>Modelo</strong></td><td>Mensajes que se borran tras el ACK</td><td>Log inmutable en disco con retención</td></tr>
+							<tr><td><strong>Consumo</strong></td><td>Workers compiten por cada mensaje</td><td>Cada grupo lee todo; dentro del grupo se reparten particiones</td></tr>
+							<tr><td><strong>Releer historia</strong></td><td>Imposible</td><td>Trivial: mover el offset</td></tr>
+							<tr><td><strong>Orden</strong></td><td>Por cola o grupo FIFO</td><td>Por partición</td></tr>
+							<tr><td><strong>Volumen típico</strong></td><td>Decenas a cientos de miles de mensajes/s</td><td>Millones de eventos/s por clúster (I/O secuencial, zero-copy)</td></tr>
+							<tr><td><strong>Brilla en</strong></td><td>Tareas de fondo, enrutamiento flexible, reintentos por mensaje</td><td>Eventos de dominio, CDC, clickstream, analítica en tiempo real</td></tr>
+						</tbody>
+					</table>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.2.4</span> Semántica de Entrega en Kafka: Cuándo Confirmas el Offset</h3>
+				<div class="table-wrapper">
+					<table>
+						<thead><tr><th>Haces commit del offset…</th><th>Si el consumidor muere en medio</th><th>Resultado</th></tr></thead>
+						<tbody>
+							<tr><td><strong>Antes</strong> de procesar</td><td>El evento se marcó leído pero nunca se procesó</td><td>At-most-once (pérdida)</td></tr>
+							<tr><td><strong>Después</strong> de procesar</td><td>Se procesó pero no se marcó: se vuelve a leer</td><td>At-least-once (duplicado) → consumidor idempotente</td></tr>
+							<tr><td>Con <strong>productor idempotente + transacciones</strong> de Kafka</td><td>Lectura, escritura a otro tópico y commit en una transacción</td><td>Exactly-once <strong>dentro de Kafka</strong> (Kafka Streams); con sistemas externos sigues necesitando idempotencia</td></tr>
+						</tbody>
+					</table>
+				</div>
+				<div class="callout pro-tip">
+					<div class="callout-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+						<span>Tres Detalles que Separan al Senior</span>
+					</div>
+					<ul style="margin-bottom:0;">
+						<li><strong>Consumer lag:</strong> cuántos eventos va atrasado cada grupo respecto al último. Es la métrica de salud número uno.</li>
+						<li><strong>Elige bien el número de particiones desde el inicio:</strong> es el techo de paralelismo de cada grupo, se pueden agregar pero no quitar, y agregar cambia a qué partición va cada clave (rompe el orden durante el cambio, igual que <code>hash % N</code> en 4.5).</li>
+						<li><strong>Schema Registry</strong> (Avro/Protobuf): los eventos son un contrato entre equipos; los cambios deben ser compatibles hacia atrás. Y <strong>log compaction</strong> conserva solo el último valor por clave: útil para "estado actual de cada cliente".</li>
+					</ul>
+				</div>
+				<div class="vs-grid">
+					<div class="vs-card novice">
+						<span class="vs-badge"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> Forma Novata</span>
+						<p style="font-size:0.88rem; margin-bottom:0;">Publica sin clave: "OrdenCancelada" cae en la partición 1 y se procesa antes que "OrdenCreada" en la partición 2. Despliega 10 pods para un tópico de 6 particiones (4 ociosos) y cambia el formato del evento sin avisar.</p>
+					</div>
+					<div class="vs-card pro">
+						<span class="vs-badge"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Versión Pro (Senior / Staff)</span>
+						<p style="font-size:0.88rem; margin-bottom:0;">Clave de partición natural del dominio (<code>customer_id</code>), particiones dimensionadas para el crecimiento, consumidores idempotentes con commit después de procesar, alertas de consumer lag y Schema Registry con compatibilidad hacia atrás.</p>
+					</div>
+				</div>
+				<div class="callout danger">
+					<div class="callout-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+						<span>Errores Comunes y Gotchas</span>
+					</div>
+					<ol style="margin-bottom:0;">
+						<li><strong>Esperar orden global entre particiones:</strong> no existe.</li>
+						<li><strong>Más consumidores que particiones en un grupo:</strong> los sobrantes no hacen nada.</li>
+						<li><strong>Claves con hotspot</strong> (un vendedor gigante como clave): una partición saturada (4.6).</li>
+						<li><strong>Procesamiento lento dentro del consumidor:</strong> si tarda más que <code>max.poll.interval</code>, Kafka cree que murió, rebalancea el grupo y se generan duplicados.</li>
+					</ol>
+				</div>
+				<div class="personal-notes-card">
+					<div class="personal-notes-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+						<span>Ficha de Repaso para tu Cuaderno</span>
+					</div>
+					<p style="font-size:0.9rem; margin-bottom:0;">Pub/sub: un evento, muchos suscriptores. <strong>Kafka</strong> = log en disco que no se borra al leerse; cada consumidor guarda su <strong>offset</strong> y puede <strong>rebobinar</strong>. Tópico → <strong>particiones</strong> por <code>hash(clave)</code>; orden <strong>solo dentro de la partición</strong>, así que la clave es la entidad (cliente, pedido). Cada partición, un consumidor por <strong>grupo</strong>. Commit después de procesar + idempotencia. Vigila el <strong>consumer lag</strong>.</p>
+				</div>
+				<div class="mastery-box">
+					<h4 style="font-family:var(--font-sans); font-size:1rem; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.45rem;">
+						<svg class="ui-icon" style="color:var(--accent-primary);" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+						<span>Autoevaluación de Raíz 6.2 (Antes de pasar al 6.3)</span>
+					</h4>
+					<p style="font-size:0.92rem; margin-bottom:0.5rem;"><strong>Pregunta 1:</strong> Diferencia entre una cola (RabbitMQ/SQS) y un log particionado (Kafka): retención, escalado y relectura.</p>
+					<details class="solution-reveal">
+						<summary>Ver respuesta razonada paso a paso</summary>
+						<div class="solution-body">
+							<p style="margin-bottom:0;"><strong>Retención:</strong> en la cola el mensaje se destruye tras el ACK; en Kafka vive en el log según la retención (ej. 7 días), y muchos grupos lo leen a su ritmo. <strong>Relectura:</strong> en la cola es imposible; en Kafka el progreso es un offset que se puede mover atrás para reprocesar. <strong>Escalado:</strong> la cola escala agregando workers que compiten por mensajes de una cola central; Kafka escala por particiones asignadas a consumidores de un grupo, sin locks y con orden garantizado dentro de cada partición.</p>
+						</div>
+					</details>
+					<p style="font-size:0.92rem; margin:1.1rem 0 0.5rem;"><strong>Pregunta 2:</strong> Un tópico tiene 12 particiones y necesitas procesar 60,000 eventos/s; cada consumidor procesa 4,000/s. ¿Alcanza?</p>
+					<details class="solution-reveal">
+						<summary>Ver respuesta razonada paso a paso</summary>
+						<div class="solution-body">
+							<p style="margin-bottom:0;">Necesitas 60,000 / 4,000 = <strong>15 consumidores</strong>, pero con 12 particiones el grupo usa como mucho 12: tope de 48,000/s. <strong>No alcanza</strong>: el lag crecerá sin parar. Opciones: aumentar las particiones (ej. a 24, con margen, sabiendo que cambia la asignación de claves), hacer cada consumidor más rápido (procesamiento por lotes, paralelismo interno manteniendo el orden por clave), o ambas.</p>
+						</div>
+					</details>
+				</div>
+			</article>
+
+			<!-- ================================================================= -->
+			<!-- PASO 6.3: EVENTOS, CQRS Y SAGAS                                   -->
+			<!-- ================================================================= -->
+			<article class="topic-chapter" id="paso-6-3">
+				<div class="chapter-meta">
+					<span class="chapter-badge">PASO 6.3 · CIMIENTO AB</span>
+					<span class="chapter-tag">Prerrequisitos: 6.1 + 6.2 + 2.5 (2PC) + 5.2 (Idempotencia)</span>
+					<span class="chapter-tag">Desbloquea: 7.1 Microservicios, 10.9 Pagos, 10.22 Reservas, 10.23 Ledger</span>
+				</div>
+				<h2 class="chapter-title">Arquitectura Basada en Eventos, CQRS y Sagas</h2>
+				<p class="chapter-subtitle">
+					Cuando cada microservicio tiene su propia base de datos, ya no existe un <code>BEGIN … COMMIT</code> que abarque una compra completa. Este tema reúne los patrones para mantener la coherencia sin transacciones distribuidas: sagas con compensación, outbox para no perder eventos, y CQRS para leer rápido.
+				</p>
+				<div class="memory-bridge">
+					<div class="memory-bridge-header">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+						<span>Conexión Progresiva</span>
+					</div>
+					<p>1. En <a href="arquitectura_sistemas_datos_almacenamiento.html#paso-2-5" class="memory-pill">2.5 (2PC y sagas)</a> adelantamos que 2PC se bloquea si cae el coordinador. Aquí construyes la alternativa.</p>
+					<p>2. En <a href="arquitectura_sistemas_rendimiento.html#paso-3-3" class="memory-pill">3.3 (CDC)</a> un conector leía el WAL para invalidar la caché. El outbox usa exactamente eso para publicar eventos sin perderlos.</p>
+					<p>3. En <a href="arquitectura_sistemas_distribuidos.html#paso-5-2" class="memory-pill">5.2 (Idempotencia)</a>: cada paso y cada compensación de una saga se puede reintentar, así que todos deben ser idempotentes.</p>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.3.1</span> El Fin de la Transacción Única</h3>
+				<p>Con una sola base, una compra es <code>BEGIN; INSERT orden; UPDATE saldo; UPDATE stock; COMMIT;</code> y si algo falla, <code>ROLLBACK</code>. Con microservicios, rige <strong>una base por servicio</strong>: Órdenes en PostgreSQL, Pagos con Stripe y DynamoDB, Inventario en MongoDB. Existe <strong>2PC</strong> (commit en dos fases) para coordinarlas, pero en la práctica retiene locks durante toda la coordinación, su disponibilidad es la del participante más débil y se queda bloqueado si el coordinador cae a la mitad.</p>
+				<div class="diagram-card">
+					<div class="diagram-header"><span>Figura 6.3A · 2PC: Todos Esperan con Locks Tomados; si el Coordinador Cae, Nadie Sabe Qué Hacer</span><span>Animado</span></div>
+					<div class="diagram-svg-wrap">
+						<svg viewBox="0 0 840 220" width="100%" style="max-width: 820px; height: auto;" role="img" aria-label="Commit en dos fases con el coordinador caído y participantes bloqueados">
+							<rect x="330" y="20" width="180" height="50" rx="9" fill="var(--accent-memory-soft)" stroke="var(--accent-memory)" stroke-width="1.6"><animate attributeName="fill" values="var(--accent-memory-soft);var(--accent-memory-soft);var(--accent-danger-soft);var(--accent-danger-soft)" keyTimes="0;0.5;0.51;1" dur="7s" repeatCount="indefinite"/></rect>
+							<text x="420" y="50" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="11" font-weight="700" fill="var(--text-primary)">Coordinador 2PC</text>
+							<text x="420" y="88" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" font-weight="700" fill="var(--accent-danger)" opacity="0">💥 cae antes de decir "COMMIT"<animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.5;0.51;1" dur="7s" repeatCount="indefinite"/></text>
+							<g font-family="Plus Jakarta Sans, sans-serif" text-anchor="middle" font-size="10.5" font-weight="700">
+								<rect x="60" y="140" width="180" height="56" rx="9" fill="var(--accent-warn-soft)" stroke="var(--accent-warn)"/><text x="150" y="163" fill="var(--text-primary)">Órdenes</text><text x="150" y="181" font-family="JetBrains Mono, monospace" font-size="9" font-weight="400" fill="var(--accent-warn)">votó SÍ · 🔒 lock tomado</text>
+								<rect x="330" y="140" width="180" height="56" rx="9" fill="var(--accent-warn-soft)" stroke="var(--accent-warn)"/><text x="420" y="163" fill="var(--text-primary)">Pagos</text><text x="420" y="181" font-family="JetBrains Mono, monospace" font-size="9" font-weight="400" fill="var(--accent-warn)">votó SÍ · 🔒 lock tomado</text>
+								<rect x="600" y="140" width="180" height="56" rx="9" fill="var(--accent-warn-soft)" stroke="var(--accent-warn)"/><text x="690" y="163" fill="var(--text-primary)">Inventario</text><text x="690" y="181" font-family="JetBrains Mono, monospace" font-size="9" font-weight="400" fill="var(--accent-warn)">votó SÍ · 🔒 lock tomado</text>
+							</g>
+							<g stroke="var(--border-strong)" stroke-dasharray="4 4"><line x1="380" y1="70" x2="150" y2="140"/><line x1="420" y1="70" x2="420" y2="140"/><line x1="460" y1="70" x2="690" y2="140"/></g>
+							<circle r="5" fill="var(--accent-memory)"><animateMotion dur="7s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;0.2;1" calcMode="linear" path="M 380 70 L 150 140"/></circle>
+							<circle r="5" fill="var(--accent-memory)"><animateMotion dur="7s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;0.2;1" calcMode="linear" path="M 420 70 L 420 140"/></circle>
+							<circle r="5" fill="var(--accent-memory)"><animateMotion dur="7s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;0.2;1" calcMode="linear" path="M 460 70 L 690 140"/></circle>
+							<text x="420" y="215" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="10" fill="var(--text-muted)">Los tres prometieron confirmar y esperan la decisión con locks tomados… indefinidamente</text>
+						</svg>
+					</div>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.3.2</span> La Saga: Pasos Locales y Compensaciones</h3>
+				<p>Una <strong>saga</strong> es una secuencia de transacciones <strong>locales</strong>, cada una en su servicio y su base. Si un paso falla, no hay rollback mágico: se ejecutan <strong>compensaciones</strong>, acciones de negocio <em>hacia adelante</em> que deshacen el efecto de los pasos anteriores (si ya cobraste, no "borras el cobro": emites un <strong>reembolso</strong>).</p>
+
+				<!-- LAB 6.3A -->
+				<div class="interactive-lab" id="lab-6-3a">
+					<div class="lab-header">
+						<div>
+							<span class="lab-badge"><svg class="ui-icon" style="width:12px;height:12px;margin-right:0.25rem;" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>Laboratorio Interactivo 6.3A</span>
+							<div class="lab-title" style="margin-top:0.35rem;">Saga de un Paquete de Viaje: Vuelo, Cobro y Hotel</div>
+						</div>
+					</div>
+					<p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:0.7rem;">Elige qué paso falla y ejecuta la saga. Mira cómo se compensan en reversa los pasos ya hechos. Luego prueba el orden "pago al final": el paso más difícil de deshacer se ejecuta último.</p>
+					<div class="lab-controls">
+						<button class="lab-btn active" id="sgOrd_std" onclick="setSagaOrder('std')">Orden: vuelo → cobro → hotel</button>
+						<button class="lab-btn" id="sgOrd_piv" onclick="setSagaOrder('piv')">Orden: vuelo → hotel → cobro (pago al final)</button>
+					</div>
+					<div class="lab-controls" id="sgFailBtns"></div>
+					<div class="lab-controls"><button class="lab-btn primary-action" onclick="runSaga()">▶ Ejecutar saga</button></div>
+					<div class="lab-stage">
+						<div class="saga-steps" id="sgSteps" style="--n:3;"></div>
+						<div class="wal-log" id="sgLog" style="min-height:90px;"></div>
+					</div>
+				</div>
+				<div class="callout pro-tip">
+					<div class="callout-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+						<span>Diseño Senior: El "Paso Pivote" va al Final</span>
+					</div>
+					<p style="margin-bottom:0;">Ordena la saga para que los pasos <strong>fáciles de deshacer</strong> (reservas temporales que expiran solas) vayan primero, y el paso <strong>caro o irreversible</strong> (cobrar, enviar un correo, despachar) vaya al final: el "pivote". Si algo falla antes del pivote, compensar es barato y no hubo efecto visible para el cliente. Mejor aún: <strong>autoriza</strong> la tarjeta al inicio (retención) y <strong>captura</strong> el cobro al final.</p>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.3.3</span> Coreografía vs. Orquestación</h3>
+				<div class="diagram-card">
+					<div class="diagram-header"><span>Figura 6.3B · Coreografía (cada uno reacciona a eventos) vs. Orquestación (un director da órdenes)</span><span>Animado</span></div>
+					<div class="diagram-svg-wrap">
+						<svg viewBox="0 0 840 230" width="100%" style="max-width: 820px; height: auto;" role="img" aria-label="Coreografía con eventos en un bus frente a orquestador central">
+							<text x="200" y="20" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="11.5" font-weight="700" fill="var(--text-primary)">COREOGRAFÍA · bus de eventos</text>
+							<rect x="30" y="100" width="340" height="30" rx="8" fill="var(--accent-memory-soft)" stroke="var(--accent-memory)"/>
+							<text x="200" y="120" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9.5" fill="var(--accent-memory)">Kafka: OrderCreated → StockReserved → PaymentDone</text>
+							<g font-family="Plus Jakarta Sans, sans-serif" font-size="10" font-weight="700" text-anchor="middle">
+								<rect x="30" y="35" width="100" height="36" rx="7" fill="var(--bg-elevated)" stroke="var(--border-strong)"/><text x="80" y="58" fill="var(--text-primary)">Órdenes</text>
+								<rect x="150" y="35" width="100" height="36" rx="7" fill="var(--bg-elevated)" stroke="var(--border-strong)"/><text x="200" y="58" fill="var(--text-primary)">Inventario</text>
+								<rect x="270" y="35" width="100" height="36" rx="7" fill="var(--bg-elevated)" stroke="var(--border-strong)"/><text x="320" y="58" fill="var(--text-primary)">Pagos</text>
+							</g>
+							<circle r="5" fill="var(--accent-primary)"><animateMotion dur="4.5s" repeatCount="indefinite" path="M 80 71 L 80 100 L 200 100 L 200 71 L 200 100 L 320 100 L 320 71"/></circle>
+							<text x="200" y="160" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="9.5" fill="var(--text-muted)">Sin dueño central: simple con 2–3 pasos,</text>
+							<text x="200" y="176" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="9.5" fill="var(--text-muted)">"espagueti de eventos" difícil de seguir con muchos</text>
+							<line x1="420" y1="10" x2="420" y2="220" stroke="var(--border-subtle)" stroke-dasharray="4 4"/>
+							<text x="630" y="20" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="11.5" font-weight="700" fill="var(--text-primary)">ORQUESTACIÓN · un director</text>
+							<rect x="560" y="40" width="140" height="44" rx="9" fill="var(--accent-warn-soft)" stroke="var(--accent-warn)" stroke-width="1.6"/>
+							<text x="630" y="60" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="10.5" font-weight="700" fill="var(--text-primary)">Orquestador</text>
+							<text x="630" y="75" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8.5" fill="var(--accent-warn)">Temporal / Step Functions</text>
+							<g font-family="Plus Jakarta Sans, sans-serif" font-size="10" font-weight="700" text-anchor="middle">
+								<rect x="450" y="150" width="100" height="36" rx="7" fill="var(--bg-elevated)" stroke="var(--border-strong)"/><text x="500" y="173" fill="var(--text-primary)">Órdenes</text>
+								<rect x="580" y="150" width="100" height="36" rx="7" fill="var(--bg-elevated)" stroke="var(--border-strong)"/><text x="630" y="173" fill="var(--text-primary)">Inventario</text>
+								<rect x="710" y="150" width="100" height="36" rx="7" fill="var(--bg-elevated)" stroke="var(--border-strong)"/><text x="760" y="173" fill="var(--text-primary)">Pagos</text>
+							</g>
+							<g stroke="var(--border-strong)" stroke-dasharray="4 4"><line x1="600" y1="84" x2="500" y2="150"/><line x1="630" y1="84" x2="630" y2="150"/><line x1="660" y1="84" x2="760" y2="150"/></g>
+							<circle r="5" fill="var(--accent-warn)"><animateMotion dur="4.5s" repeatCount="indefinite" path="M 600 84 L 500 150 L 600 84 L 630 84 L 630 150 L 630 84 L 660 84 L 760 150 L 660 84"/></circle>
+							<text x="630" y="210" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="9.5" fill="var(--text-muted)">Estado de la saga en un solo lugar: fácil de auditar, reintentar y ver</text>
+						</svg>
+					</div>
+				</div>
+				<div class="table-wrapper">
+					<table>
+						<thead><tr><th>Modalidad</th><th>Cómo funciona</th><th>Úsala cuando</th></tr></thead>
+						<tbody>
+							<tr><td><strong>Coreografía</strong></td><td>Cada servicio escucha eventos y reacciona; no hay director</td><td>Flujos de 2–3 pasos, sin ramas complejas</td></tr>
+							<tr><td><strong>Orquestación</strong></td><td>Un orquestador (Temporal, AWS Step Functions, Camunda) manda comandos y guarda el estado de la saga como máquina de estados</td><td>Muchos pasos, reintentos condicionales, esperas largas (aprobación humana), auditoría estricta</td></tr>
+						</tbody>
+					</table>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.3.4</span> El Outbox Transaccional: No Perder el Evento</h3>
+				<p>El error más común en sistemas con eventos es la <strong>doble escritura</strong>: guardar en la base y luego publicar en Kafka. Si el proceso muere entre ambos (o Kafka no responde), la orden existe pero ningún otro servicio se entera. Y al revés, si publicas primero y la base falla, avisaste de algo que no existe.</p>
+
+				<!-- LAB 6.3B -->
+				<div class="interactive-lab" id="lab-6-3b">
+					<div class="lab-header">
+						<div>
+							<span class="lab-badge"><svg class="ui-icon" style="width:12px;height:12px;margin-right:0.25rem;" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>Laboratorio Interactivo 6.3B</span>
+							<div class="lab-title" style="margin-top:0.35rem;">Doble Escritura vs. Outbox: El Proceso Muere entre Guardar y Publicar</div>
+						</div>
+					</div>
+					<div class="lab-controls">
+						<button class="lab-btn active" id="obBtnDual" onclick="setOb(false)">Doble escritura (BD y luego Kafka)</button>
+						<button class="lab-btn" id="obBtnOut" onclick="setOb(true)">Outbox + relay / CDC</button>
+						<button class="lab-btn primary-action" onclick="runOb(false)">▶ Crear orden (todo bien)</button>
+						<button class="lab-btn danger-btn" onclick="runOb(true)">💥 Crear orden y morir después de guardar</button>
+					</div>
+					<div class="visual-canvas-box"><div class="schematic-header"><span id="obBanner">—</span><span class="canvas-status-pill" id="obPill">—</span></div><div id="obSvg"></div></div>
+					<div class="wal-log" id="obLog" style="min-height:70px;"></div>
+				</div>
+<pre><code>-- 1. En la MISMA transacción local: el dato y el evento
+BEGIN;
+  INSERT INTO orders (id, user_id, total) VALUES (101, 42, 150);
+  INSERT INTO outbox (id, topic, key, payload)
+         VALUES (gen_random_uuid(), 'orders', '42', '{"type":"OrderCreated","order_id":101}');
+COMMIT;            -- o se guardan ambos, o ninguno (A de ACID, 2.1)
+
+-- 2. Un relay (o Debezium leyendo el WAL = CDC) publica lo pendiente en Kafka
+--    y lo marca como enviado. Si se cae, al volver reintenta: entrega at-least-once,
+--    así que los consumidores deduplican por el id del evento (6.1).</code></pre>
+
+				<h3 class="section-heading"><span class="sec-num">6.3.5</span> CQRS: Un Modelo para Escribir, Otro para Leer</h3>
+				<p>El modelo ideal para <strong>escribir</strong> (normalizado, con restricciones, transaccional: 2.1) no es el ideal para <strong>leer</strong> (desnormalizado, con filtros, búsqueda de texto, agregados). <strong>CQRS</strong> (<em>Command Query Responsibility Segregation</em>) los separa: los comandos escriben en la base transaccional y emiten eventos; un <strong>proyector</strong> consume esos eventos y mantiene una <strong>vista materializada</strong> optimizada para consultar (Elasticsearch, Redis, una tabla desnormalizada). El precio: la vista va unos milisegundos o segundos atrás.</p>
+
+				<!-- LAB 6.3C -->
+				<div class="interactive-lab" id="lab-6-3c">
+					<div class="lab-header">
+						<div>
+							<span class="lab-badge"><svg class="ui-icon" style="width:12px;height:12px;margin-right:0.25rem;" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>Laboratorio Interactivo 6.3C</span>
+							<div class="lab-title" style="margin-top:0.35rem;">CQRS: El Lado de Lectura Va Atrasado (Lag de Proyección)</div>
+						</div>
+					</div>
+					<div class="slider-group">
+						<div class="slider-item"><div class="slider-top"><span>Lag del proyector</span><span id="cqLagVal">1.5 s</span></div><input type="range" id="cqLag" min="0.2" max="5" step="0.1" value="1.5" oninput="document.getElementById('cqLagVal').textContent=(+this.value).toFixed(1)+' s'"></div>
+					</div>
+					<div class="lab-controls">
+						<button class="lab-btn primary-action" onclick="cqrsWrite()">✎ Comando: cambiar estado del pedido 101</button>
+						<button class="lab-btn" onclick="cqrsRead()">🔎 Consulta: buscar pedidos "enviados"</button>
+					</div>
+					<div class="visual-canvas-box"><div id="cqrsSvg"></div></div>
+					<div class="wal-log" id="cqrsLog" style="min-height:60px;"></div>
+				</div>
+				<div class="callout tradeoff">
+					<div class="callout-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+						<span>Event Sourcing (el Primo Radical de CQRS)</span>
+					</div>
+					<p style="margin-bottom:0;">En vez de guardar el estado actual ("saldo = 700"), guardas <strong>la lista de eventos</strong> que lo produjeron ("abrió con 1,000", "retiró 300") y el estado se calcula reproduciéndolos. Ganas auditoría completa y viajar en el tiempo (como rebobinar Kafka). Pagas complejidad: reconstruir estados (con <em>snapshots</em>), versionar eventos y consultar (necesitas proyecciones CQRS sí o sí). Es natural en contabilidad y ledgers (10.23); en un CRUD normal, suele ser excesivo.</p>
+				</div>
+				<div class="table-wrapper">
+					<table>
+						<thead><tr><th>Si eliges ganar...</th><th>Estás aceptando pagar el costo de...</th></tr></thead>
+						<tbody>
+							<tr><td><strong>Sagas en vez de 2PC</strong>: disponibilidad y cada servicio dueño de sus datos</td><td>Estados intermedios visibles (consistencia eventual) y diseñar/probar una compensación por paso.</td></tr>
+							<tr><td><strong>Outbox</strong>: nunca perder un evento</td><td>Una tabla extra, un relay o CDC que operar, y entrega at-least-once.</td></tr>
+							<tr><td><strong>CQRS</strong>: lecturas &lt; 10 ms y escalar lectura y escritura por separado</td><td>Datos duplicados y lag de proyección.</td></tr>
+						</tbody>
+					</table>
+				</div>
+				<div class="vs-grid">
+					<div class="vs-card novice">
+						<span class="vs-badge"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> Forma Novata</span>
+						<p style="font-size:0.88rem; margin-bottom:0;">Encadena HTTP síncrono entre servicios: <code>POST /orders</code> llama a <code>/payments</code>, que llama a <code>/inventory</code>. Inventario hace timeout: el dinero quedó cobrado, el producto nunca sale y no hay forma de revertir.</p>
+					</div>
+					<div class="vs-card pro">
+						<span class="vs-badge"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Versión Pro (Senior / Staff)</span>
+						<p style="font-size:0.88rem; margin-bottom:0;">Saga orquestada con compensaciones explícitas e idempotentes, pago como paso pivote al final, outbox con CDC para publicar en Kafka sin perder eventos, y CQRS para las pantallas de búsqueda.</p>
+					</div>
+				</div>
+				<div class="callout danger">
+					<div class="callout-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+						<span>Errores Comunes y Gotchas</span>
+					</div>
+					<ol style="margin-bottom:0;">
+						<li><strong>Creer que una compensación es un rollback:</strong> es una nueva acción de negocio (reembolso, nota de crédito), con su propio rastro.</li>
+						<li><strong>Pasos o compensaciones no idempotentes:</strong> un reintento de la compensación = reembolso doble.</li>
+						<li><strong>Doble escritura BD + broker:</strong> eventos perdidos o fantasmas. Outbox.</li>
+						<li><strong>Olvidar que los estados intermedios son visibles:</strong> el usuario puede ver "reservado" y luego "cancelado"; diséñalo en la UI ("procesando…").</li>
+						<li><strong>Leer de la vista CQRS justo después de escribir:</strong> el usuario no ve su cambio (el mismo problema de 4.3); lee del lado de escritura en ese caso.</li>
+					</ol>
+				</div>
+				<div class="personal-notes-card">
+					<div class="personal-notes-title">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+						<span>Ficha de Repaso para tu Cuaderno</span>
+					</div>
+					<p style="font-size:0.9rem; margin-bottom:0;">Sin una base común no hay transacción única; 2PC bloquea. <strong>Saga</strong> = pasos locales + <strong>compensaciones</strong> en reversa (acciones nuevas, idempotentes); el paso irreversible va <strong>al final</strong>. <strong>Coreografía</strong> (eventos, sin director) para flujos cortos; <strong>orquestación</strong> (Temporal, Step Functions) para flujos complejos. <strong>Outbox</strong>: dato y evento en la misma transacción + relay/CDC. <strong>CQRS</strong>: escribir normalizado, leer de una vista proyectada, con lag.</p>
+				</div>
+				<div class="mastery-box">
+					<h4 style="font-family:var(--font-sans); font-size:1rem; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.45rem;">
+						<svg class="ui-icon" style="color:var(--accent-primary);" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+						<span>Autoevaluación de Raíz 6.3 (Cierre de la Fase 6)</span>
+					</h4>
+					<p style="font-size:0.92rem; margin-bottom:0.5rem;"><strong>Pregunta 1:</strong> Diseña la saga de un paquete de viaje (vuelo, cobro, hotel) con la compensación de cada paso, si el hotel no tiene habitaciones.</p>
+					<details class="solution-reveal">
+						<summary>Ver respuesta razonada paso a paso</summary>
+						<div class="solution-body">
+							<p><strong>Paso 1 · Vuelo:</strong> retener el asiento 15 min (<code>RESERVADO_TEMPORAL</code>). <em>Compensación:</em> liberar la retención. <strong>Paso 2 · Cobro:</strong> cargo <code>ch_8829</code>. <em>Compensación:</em> reembolso referenciando <code>ch_8829</code>. <strong>Paso 3 · Hotel:</strong> el proveedor responde 409 sin disponibilidad. El orquestador compensa en reversa: reembolso, luego liberar el asiento, y marca el viaje como <code>FALLIDO_SIN_HOTEL</code> y avisa al usuario. Todas las compensaciones con llave de idempotencia por si se reintentan.</p>
+							<p style="margin-bottom:0;"><strong>Mejora Senior:</strong> reordenar a vuelo → hotel → cobro (o autorizar la tarjeta al inicio y capturar al final). Si el hotel falla, solo hay que liberar el asiento: el cliente nunca ve un cargo y un reembolso en su estado de cuenta.</p>
+						</div>
+					</details>
+					<p style="font-size:0.92rem; margin:1.1rem 0 0.5rem;"><strong>Pregunta 2:</strong> ¿Por qué "guardar en la base y luego publicar en Kafka" pierde eventos, y cómo lo arregla el outbox?</p>
+					<details class="solution-reveal">
+						<summary>Ver respuesta razonada paso a paso</summary>
+						<div class="solution-body">
+							<p style="margin-bottom:0;">Son dos sistemas distintos sin transacción común: si el proceso muere o Kafka falla entre el <code>COMMIT</code> y el <code>publish</code>, el dato existe y el evento no, y los demás servicios nunca reaccionan. El outbox mete el evento <strong>en la misma base y la misma transacción</strong> que el dato (atomicidad local, 2.1); después, un relay o Debezium leyendo el WAL lo publica, reintentando hasta lograrlo. Puede publicarse dos veces (at-least-once), por eso los consumidores deduplican por id de evento.</p>
+						</div>
+					</details>
+				</div>
+
+				<h3 class="section-heading"><span class="sec-num">6.3.6</span> Mapa de Memoria Acumulativo: Cómo se Conectan los 3 Temas de la Fase 6</h3>
+				<div class="table-wrapper">
+					<table>
+						<thead><tr><th>Tema</th><th>Pregunta raíz</th><th>Cómo usa lo anterior</th><th>Qué desbloquea</th></tr></thead>
+						<tbody>
+							<tr><td><strong>6.1 Colas</strong></td><td>¿Cómo respondo ya y trabajo después sin perder nada?</td><td>Little de 1.5, idempotencia de 5.2, "¿muerto o lento?" de 5.4.</td><td>10.4 (notificaciones), 10.21 (job scheduler), 9.1 (backpressure).</td></tr>
+							<tr><td><strong>6.2 Kafka</strong></td><td>¿Cómo se enteran muchos servicios del mismo hecho?</td><td>WAL de 2.1, particiones de 4.4, hotspots de 4.6, "una partición un consumidor" de 5.6.</td><td>8.4 (pipelines), 10.18 (clics de anuncios), CDC.</td></tr>
+							<tr><td><strong>6.3 Eventos y sagas</strong></td><td>¿Cómo mantengo coherencia sin transacción única?</td><td>2PC de 2.5, CDC de 3.3, idempotencia de 5.2, Kafka de 6.2.</td><td>7.1 (microservicios), 10.9 (pagos), 10.23 (ledger).</td></tr>
+						</tbody>
+					</table>
+				</div>
+				<div class="memory-bridge">
+					<div class="memory-bridge-header">
+						<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+						<span>Puente hacia la Fase 7 · Arquitectura de Aplicaciones</span>
+					</div>
+					<p style="margin-bottom:0;">Con colas, eventos y sagas ya tienes las piezas para partir un sistema en servicios. La Fase 7 pregunta cuándo conviene hacerlo y cómo protegerlo: <strong>monolito vs. microservicios</strong> (7.1), <strong>autenticación y autorización</strong> (7.2), <strong>rate limiting</strong> (7.3), <strong>observabilidad y SLOs</strong> (7.4), <strong>seguridad de datos</strong> (7.5), <strong>API Gateway y service mesh</strong> (7.6), <strong>multi-tenancy</strong> (7.7) y <strong>migraciones sin downtime</strong> (7.8).</p>
+				</div>
+			</article>
+		</main>
+	</div>
+	<!-- FLOATING BUTTON TO REOPEN SIDEBAR WHEN COLLAPSED -->
+	<button class="sidebar-expand-fab" id="sidebarExpandFab" onclick="toggleSidebar()" title="Mostrar barra lateral (Atajo: [)" aria-label="Mostrar barra lateral">
+		<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m13 9 3 3-3 3"/></svg>
+		<span>Índice</span>
+	</button>
+
+	<script>
+		// 1. Controles de lectura (tema, fuente, tamaño, barra lateral)
+		let currentFontSize = 17;
+		function toggleSidebar() {
+			const shell = document.getElementById('appShell');
+			const isCollapsed = shell.classList.toggle('sidebar-collapsed');
+			document.body.classList.toggle('sidebar-is-collapsed', isCollapsed);
+		}
+		window.addEventListener('keydown', (e) => {
+			if (e.key === '[' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) toggleSidebar();
+		});
+		function setTheme(theme) {
+			document.documentElement.setAttribute('data-theme', theme);
+			document.getElementById('btnThemeLight').classList.toggle('active', theme === 'light');
+			document.getElementById('btnThemeDark').classList.toggle('active', theme === 'dark');
+			try { localStorage.setItem('sd-theme', theme); } catch (e) {}
+		}
+		function setFont(font) {
+			document.documentElement.setAttribute('data-font', font);
+			document.getElementById('btnFontSans').classList.toggle('active', font === 'sans');
+			document.getElementById('btnFontSerif').classList.toggle('active', font === 'serif');
+		}
+		function changeFontSize(delta) {
+			currentFontSize = delta === 0 ? 17 : Math.min(21, Math.max(14, currentFontSize + delta));
+			document.documentElement.style.setProperty('--base-size', currentFontSize + 'px');
+		}
+
+		// 2. Barra de progreso y resaltado del índice
+		window.addEventListener('scroll', () => {
+			const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+			const pct = docHeight > 0 ? (window.scrollY / docHeight) * 100 : 0;
+			document.getElementById('readingProgress').style.width = pct + '%';
+			const sections = ['paso-6-1', 'paso-6-2', 'paso-6-3'];
+			let current = sections[0];
+			for (const id of sections) {
+				const el = document.getElementById(id);
+				if (el && el.getBoundingClientRect().top <= 180) current = id;
+			}
+			document.querySelectorAll('#mainNav a').forEach(link => {
+				link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+			});
+		}, { passive: true });
+
+		// En celular: al tocar un enlace del índice, cerrar el menú
+		document.querySelectorAll('#mainNav a').forEach(a => a.addEventListener('click', () => {
+			if (window.innerWidth <= 1024 && !document.getElementById('appShell').classList.contains('sidebar-collapsed')) toggleSidebar();
+		}));
+
+		// =================================================================
+		// HELPERS SVG
+		// =================================================================
+		const T = (x, y, t, o) => `<text x="${x}" y="${y}" text-anchor="${(o && o.a) || 'middle'}" font-family="${(o && o.mono) ? 'JetBrains Mono, monospace' : 'Plus Jakarta Sans, sans-serif'}" font-size="${(o && o.s) || 10}" font-weight="${(o && o.w) || 400}" fill="${(o && o.c) || 'var(--text-primary)'}">${t}</text>`;
+		const BOX = (x, y, w, h, kind) => {
+			const c = { p: 'primary', m: 'memory', g: 'pro', w: 'warn', d: 'danger', n: null }[kind];
+			return c ? `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="9" fill="var(--accent-${c}-soft)" stroke="var(--accent-${c})" stroke-width="1.6"/>`
+				: `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="9" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5"/>`;
+		};
+		const MOVE = (path, color, dur, begin, r) => `<circle r="${r || 6}" fill="${color}" stroke="var(--bg-surface)" stroke-width="1.5" opacity="0"><set attributeName="opacity" to="1" begin="${begin || 0}s"/><set attributeName="opacity" to="0" begin="${(begin || 0) + dur + 0.15}s"/><animateMotion dur="${dur}s" begin="${begin || 0}s" fill="freeze" path="${path}"/></circle>`;
+		const fmtN = n => Math.round(n).toLocaleString('en-US');
+		function fnv32(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return h >>> 0; }
+		const sleepT = (arr, ms, fn) => arr.push(setTimeout(fn, ms));
+
+		// =================================================================
+		// LAB 6.1A: SÍNCRONO VS COLA
+		// =================================================================
+		function recalcSync() {
+			const q = +document.getElementById('syQ').value;
+			document.getElementById('syQVal').textContent = q;
+			const syncW = 7.62, asyncW = 0.035, pool = 200;
+			const tSync = q * syncW, tAsync = q * asyncW;
+			const row = (label, v, col) => `<div class="hbar-row"><span>${label}</span><div class="hbar-track"><div class="hbar-fill" style="width:${Math.min(100, v / pool * 100)}%; background:${col};"></div></div><span style="text-align:right; color:${v > pool ? 'var(--accent-danger)' : 'var(--text-secondary)'};">${fmtN(v)} hilos</span></div>`;
+			document.getElementById('syStage').innerHTML = row('Síncrono (7.6 s)', tSync, tSync > pool ? 'var(--accent-danger)' : 'var(--accent-warn)') + row('Con cola (35 ms)', tAsync, 'var(--accent-pro)') + `
+				<div class="metric-pills">
+					<div class="metric-card"><span class="metric-label">Pool de la API</span><span class="metric-val">200 hilos</span></div>
+					<div class="metric-card"><span class="metric-label">Síncrono</span><span class="metric-val" style="color:${tSync > pool ? 'var(--accent-danger)' : 'var(--accent-pro)'};">${tSync > pool ? '✗ 504 Gateway Timeout' : '✓ aguanta'}</span></div>
+					<div class="metric-card"><span class="metric-label">Con cola</span><span class="metric-val" style="color:var(--accent-pro);">✓ ${Math.round(tAsync / pool * 100)}% del pool</span></div>
+				</div>
+				<p style="font-size:0.84rem; color:var(--text-secondary); margin:0.5rem 0 0;">Ley de Little (1.5): hilos ocupados = compras/s × duración. Con la cola, el trabajo lento sigue existiendo, pero lo hacen workers aparte que escalan solos y no bloquean a quien está comprando.</p>`;
+		}
+
+		// =================================================================
+		// LAB 6.1B: SIMULADOR DE COLA
+		// =================================================================
+		let qs = null;
+		function qsInit() {
+			if (qs && qs.timer) clearInterval(qs.timer);
+			qs = { q: [], w: [], dlq: [], tick: 0, next: 1, done: 0, re: 0, timer: null };
+			qsSetWorkers();
+			qs.timer = setInterval(qsTick, 700);
+		}
+		function qsSetWorkers() {
+			const n = +document.getElementById('qsW').value;
+			document.getElementById('qsWVal').textContent = n;
+			while (qs.w.length < n) qs.w.push({ id: qs.w.length + 1, msg: null, left: 0, deadUntil: 0 });
+			while (qs.w.length > n) { const w = qs.w.pop(); }
+			qsRender();
+		}
+		function qsLog(l) { const el = document.getElementById('qsLog'); el.innerHTML = `<span class="dim">[t${qs.tick}]</span> ` + l + '<br>' + el.innerHTML; const lines = el.innerHTML.split('<br>'); if (lines.length > 8) el.innerHTML = lines.slice(0, 8).join('<br>'); }
+		function qsTick() {
+			qs.tick++;
+			const n = +document.getElementById('qsIn').value;
+			for (let i = 0; i < n; i++) qs.q.push({ id: qs.next++, poison: false, attempts: 0, inv: null });
+			qs.q.forEach(m => {
+				if (m.inv !== null && m.inv <= qs.tick && !qs.w.some(w => w.msg === m)) {
+					m.inv = null;
+					if (m.attempts >= 3) { m.toDlq = true; }
+					else { qs.re++; qsLog(`<span class="warn">#${m.id} sin ACK tras el visibility timeout → vuelve a ser visible (intento ${m.attempts + 1})</span>`); }
+				}
+			});
+			qs.q.filter(m => m.toDlq).forEach(m => { qs.dlq.push(m); qsLog(`<span class="err">#${m.id} falló 3 veces → DEAD LETTER QUEUE. La cola sigue sana.</span>`); });
+			qs.q = qs.q.filter(m => !m.toDlq);
+			qs.w.forEach(w => {
+				if (w.deadUntil > qs.tick) return;
+				if (w.msg) {
+					w.left--;
+					if (w.msg.poison && w.left <= 1) { qsLog(`<span class="err">☠ Worker ${w.id} se cae procesando #${w.msg.id} (mensaje venenoso). Sin ACK.</span>`); w.msg = null; w.deadUntil = qs.tick + 2; return; }
+					if (w.left <= 0) { qs.q = qs.q.filter(m => m !== w.msg); qs.done++; w.msg = null; }
+				}
+				if (!w.msg && w.deadUntil <= qs.tick) {
+					const m = qs.q.find(x => x.inv === null);
+					if (m) { m.inv = qs.tick + 5; m.attempts++; w.msg = m; w.left = 3; }
+				}
+			});
+			qsRender();
+		}
+		function qsRender() {
+			const vis = qs.q.filter(m => m.inv === null).length;
+			document.getElementById('qsQueue').innerHTML = qs.q.slice(0, 60).map(m => `<span class="msg-chip ${m.poison ? 'poison' : ''} ${m.inv !== null ? 'inflight' : ''} ${m.attempts > 1 && m.inv === null ? 'retry' : ''}">#${m.id}${m.poison ? '☠' : ''}${m.attempts > 1 ? '·' + m.attempts : ''}</span>`).join('') + (qs.q.length > 60 ? `<span class="msg-chip">+${qs.q.length - 60}</span>` : '') || '<span style="font-size:0.75rem; color:var(--text-muted);">(vacía)</span>';
+			document.getElementById('qsWorkers').innerHTML = qs.w.map(w => {
+				const dead = w.deadUntil > qs.tick;
+				return `<div class="worker-box ${dead ? 'dead' : w.msg ? 'busy' : ''}"><b>Worker ${w.id}</b>${dead ? '💥 reiniciando…' : w.msg ? `procesando #${w.msg.id}${w.msg.poison ? '☠' : ''}<br>faltan ${w.left} ticks` : 'libre'}</div>`;
+			}).join('');
+			document.getElementById('qsDlq').innerHTML = qs.dlq.map(m => `<span class="msg-chip poison">#${m.id}☠</span>`).join('') || '<span style="font-size:0.75rem; color:var(--text-muted);">(vacía)</span>';
+			const d = document.getElementById('qsDepth'); d.textContent = vis + ' visibles · ' + (qs.q.length - vis) + ' en vuelo'; d.style.color = vis > 15 ? 'var(--accent-danger)' : '';
+			document.getElementById('qsDone').textContent = qs.done;
+			document.getElementById('qsRe').textContent = qs.re;
+		}
+		function qsToggle() { const b = document.getElementById('qsRun'); if (qs.timer) { clearInterval(qs.timer); qs.timer = null; b.textContent = '⏵ Reanudar'; } else { qs.timer = setInterval(qsTick, 700); b.textContent = '⏸ Pausar'; } }
+		function qsPoison() { qs.q.push({ id: qs.next++, poison: true, attempts: 0, inv: null }); qsLog('<span class="err">☠ Llegó un mensaje venenoso (PDF corrupto).</span>'); qsRender(); }
+		function qsKill() {
+			const w = qs.w[0];
+			if (!w.msg) { qsLog('<span class="dim">El worker 1 está libre; espera a que tome un mensaje.</span>'); return; }
+			qsLog(`<span class="err">💥 Worker 1 murió a la mitad de #${w.msg.id}. El mensaje sigue invisible hasta que venza su timeout.</span>`);
+			w.msg = null; w.deadUntil = qs.tick + 4; qsRender();
+		}
+
+		// =================================================================
+		// LAB 6.1C: GARANTÍAS DE ENTREGA
+		// =================================================================
+		let dgMode = 'amo', dgTimer = null;
+		const DG = {
+			ack: {
+				amo: { rows: [{ b: 'Entrega #77 y lo BORRA de inmediato', w: 'W1 recibe' }, { w: 'W1 envía el correo', c: '📧 1', mc: 'good' }, { w: 'ACK… (no hace falta)', b: 'ya no tenía el mensaje' }], v: ['good', '1 correo. Aquí at-most-once salió bien: el ACK no importaba.'] },
+				alo: { rows: [{ b: 'Entrega #77 (invisible 30 s)', w: 'W1 recibe' }, { w: 'W1 envía el correo', c: '📧 1' }, { w: 'ACK ✗ se pierde en la red', mw: 'wait' }, { b: '30 s sin ACK → RE-ENTREGA', w: 'W2 recibe #77', mb: 'wait' }, { w: 'W2 envía el correo', c: '📧 2', mc: 'bad', mw: 'bad' }], v: ['bad', '2 correos: el cliente recibe la confirmación duplicada. Con un cobro sería un cargo doble.'] },
+				eo: { rows: [{ b: 'Entrega #77 (invisible 30 s)', w: 'W1 recibe' }, { w: 'W1: INSERT processed(77) + envía correo', c: '📧 1' }, { w: 'ACK ✗ se pierde en la red', mw: 'wait' }, { b: '30 s sin ACK → RE-ENTREGA', w: 'W2 recibe #77', mb: 'wait' }, { w: 'W2: INSERT processed(77) → ya existe → solo ACK', c: '📧 1', mw: 'good', mc: 'good' }], v: ['good', '1 correo. Se entregó dos veces, pero el efecto ocurrió una vez.'] }
+			},
+			crash: {
+				amo: { rows: [{ b: 'Entrega #77 y lo BORRA de inmediato', w: 'W1 recibe' }, { w: '💥 W1 muere antes de enviar', mw: 'bad' }, { b: 'ya no tiene el mensaje: nadie lo reintenta', c: '📧 0', mb: 'bad', mc: 'bad' }], v: ['bad', '0 correos: el mensaje se perdió para siempre.'] },
+				alo: { rows: [{ b: 'Entrega #77 (invisible 30 s)', w: 'W1 recibe' }, { w: '💥 W1 muere antes de enviar', mw: 'wait' }, { b: '30 s sin ACK → RE-ENTREGA', w: 'W2 recibe #77' }, { w: 'W2 envía el correo + ACK', c: '📧 1', mc: 'good' }], v: ['good', '1 correo: nada se pierde.'] },
+				eo: { rows: [{ b: 'Entrega #77 (invisible 30 s)', w: 'W1 recibe' }, { w: '💥 W1 muere antes de enviar (su transacción no confirmó)', mw: 'wait' }, { b: '30 s sin ACK → RE-ENTREGA', w: 'W2 recibe #77' }, { w: 'W2: INSERT processed(77) OK → envía + ACK', c: '📧 1', mc: 'good' }], v: ['good', '1 correo: ni pérdida ni duplicado.'] }
+			}
+		};
+		function setDg(m) { dgMode = m; ['amo', 'alo', 'eo'].forEach(k => document.getElementById('dgBtn_' + k).classList.toggle('active', k === m)); }
+		function runDg(sc) {
+			if (dgTimer) clearInterval(dgTimer);
+			const d = DG[sc][dgMode];
+			let n = 0;
+			const render = () => {
+				let h = ['#', 'Broker', 'Worker', 'Cliente'].map(x => `<div class="tx-cell h">${x}</div>`).join('');
+				d.rows.forEach((r, i) => {
+					const st = i < n - 1 ? '' : i === n - 1 ? ' now' : ' future';
+					const c = (t, m) => `<div class="tx-cell${st}${t && m && st !== ' future' ? ' ' + m : ''}">${t || ''}</div>`;
+					h += `<div class="tx-cell${st}">${i + 1}</div>` + c(d.rows[i].b, r.mb) + c(r.w, r.mw) + c(r.c, r.mc);
+				});
+				document.getElementById('dgTl').innerHTML = h;
+				const o = document.getElementById('dgOut');
+				if (n >= d.rows.length) { o.className = 'verdict-box ' + d.v[0]; o.innerHTML = d.v[1]; } else { o.className = 'verdict-box'; o.textContent = `Paso ${n} de ${d.rows.length}…`; }
+			};
+			render();
+			dgTimer = setInterval(() => { n++; render(); if (n >= d.rows.length) clearInterval(dgTimer); }, 900);
+		}
+
+		// =================================================================
+		// LAB 6.2A: KAFKA PLAYGROUND
+		// =================================================================
+		const KF_USERS = ['Ana', 'Beto', 'Carla', 'Diego', 'Elena'];
+		const KF_COL = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+		const KF_TYPES = ['Creada', 'Pagada', 'Enviada'];
+		let kf = null;
+		function kfReset() { kf = { parts: [[], [], []], rr: 0, nextUser: 0, envios: [0, 0, 0], analitica: [0, 0, 0], seen: {} }; document.getElementById('kfLog').innerHTML = '<span class="dim">// Tópico vacío.</span>'; kfRender(); }
+		function kfLog(l) { const el = document.getElementById('kfLog'); el.innerHTML = l + '<br>' + el.innerHTML; }
+		function kfFlow(withKey) {
+			const u = kf.nextUser++ % KF_USERS.length;
+			const parts = [];
+			KF_TYPES.forEach((t, i) => {
+				const p = withKey ? fnv32('u' + u) % 3 : (kf.rr++ % 3);
+				kf.parts[p].push({ u, t, seq: i });
+				parts.push(p);
+			});
+			kf.analitica = kf.parts.map(x => x.length);
+			kfLog(withKey ? `✓ ${KF_USERS[u]}: los 3 eventos con clave "${KF_USERS[u]}" → todos a la <strong>P${parts[0]}</strong> (orden garantizado)` : `<span class="warn">⚠ ${KF_USERS[u]}: sin clave, sus eventos se reparten en P${parts.join(', P')} → nadie garantiza su orden</span>`);
+			kfRender();
+		}
+		function kfAssign(c) { return Array.from({ length: c }, (_, i) => [0, 1, 2].filter(p => p % c === i && i < 3)); }
+		function kfConsume() {
+			const c = +document.getElementById('kfC').value;
+			const order = [];
+			const pend = kf.parts.map((pp, p) => pp.slice(kf.envios[p]).map(e => ({ ...e, p })));
+			const delays = [2, 0, 1];
+			const timeline = [];
+			pend.forEach((list, p) => list.forEach((e, i) => timeline.push({ e, t: i * 1 + delays[p] * 0.5 + Math.random() * 0.4 })));
+			timeline.sort((a, b) => a.t - b.t).forEach(x => order.push(x.e));
+			let bad = [];
+			order.forEach(e => { const last = kf.seen[e.u] ?? -1; if (e.seq < last) bad.push(`${KF_USERS[e.u]}: "${KF_TYPES[e.seq]}" llegó después de "${KF_TYPES[last]}"`); kf.seen[e.u] = Math.max(last, e.seq); });
+			kf.envios = kf.parts.map(x => x.length);
+			if (!order.length) kfLog('<span class="dim">Nada pendiente para "envíos".</span>');
+			else kfLog(bad.length ? `<span class="err">✗ "envíos" procesó ${order.length} eventos en paralelo y hubo desorden: ${bad.join('; ')}</span>` : `<span class="ok">✓ "envíos" procesó ${order.length} eventos en paralelo; el orden por usuario se respetó.</span>`);
+			kfRender();
+		}
+		function kfRewind() { kf.analitica = [0, 0, 0]; kfLog('<span class="warn">⏪ "analítica" movió su offset a 0: reprocesará toda la historia. "envíos" ni se entera.</span>'); kfRender(); }
+		function kfRender() {
+			const c = +document.getElementById('kfC').value;
+			document.getElementById('kfCVal').textContent = c;
+			document.getElementById('kfParts').innerHTML = kf.parts.map((pp, p) => `<div class="kafka-part"><span class="pname">P${p}<br><small style="font-weight:400; color:var(--text-muted);">envíos @${kf.envios[p]}</small></span><div class="kafka-log">${pp.map((e, i) => `<span class="kafka-ev ${i < kf.envios[p] ? 'read' : ''}" style="background:${KF_COL[e.u]};">${KF_USERS[e.u][0]}·${e.t}<small>offset ${i}</small></span>`).join('') || '<span style="font-size:0.7rem; color:var(--text-muted);">(vacía)</span>'}</div></div>`).join('');
+			const asg = kfAssign(c);
+			const lagE = kf.parts.reduce((a, pp, p) => a + pp.length - kf.envios[p], 0);
+			const lagA = kf.parts.reduce((a, pp, p) => a + pp.length - kf.analitica[p], 0);
+			document.getElementById('kfGroups').innerHTML = `<div class="server-row" style="--n:2;">
+				<div class="server-card"><div class="sv-name"><span>Grupo "envíos"</span><span>lag: ${lagE}</span></div>${asg.map((ps, i) => `Consumidor ${i + 1}: ${ps.length ? ps.map(p => 'P' + p).join(', ') : '<span style="color:var(--accent-danger); font-weight:700;">OCIOSO (no hay partición libre)</span>'}`).join('<br>')}</div>
+				<div class="server-card"><div class="sv-name"><span>Grupo "analítica"</span><span style="color:${lagA ? 'var(--accent-warn)' : 'var(--accent-pro)'};">lag: ${lagA}</span></div>1 consumidor: P0, P1, P2<br>offsets: ${kf.analitica.join(' · ')}<br><small style="color:var(--text-muted);">lee lo mismo que "envíos", por su cuenta</small></div>
+			</div>`;
+		}
+
+		// =================================================================
+		// LAB 6.3A: SAGA
+		// =================================================================
+		const SG_STEPS = {
+			vuelo: { name: '✈ Vuelo', act: 'retener asiento 15 min', comp: 'liberar el asiento' },
+			cobro: { name: '💳 Cobro', act: 'cobrar $1,200 (ch_8829)', comp: 'REEMBOLSAR ch_8829 (el cliente verá cargo y reembolso)' },
+			hotel: { name: '🏨 Hotel', act: 'reservar habitación', comp: 'cancelar la reserva del hotel' }
+		};
+		let sg = { order: 'std', fail: 'hotel', timers: [] };
+		const sgSeq = () => sg.order === 'std' ? ['vuelo', 'cobro', 'hotel'] : ['vuelo', 'hotel', 'cobro'];
+		function setSagaOrder(o) { sg.order = o; ['std', 'piv'].forEach(k => document.getElementById('sgOrd_' + k).classList.toggle('active', k === o)); sgButtons(); sgRenderSteps({}); }
+		function setSagaFail(f) { sg.fail = f; sgButtons(); }
+		function sgButtons() {
+			const opts = [['none', 'Nada falla'], ...sgSeq().map(k => [k, 'Falla: ' + SG_STEPS[k].name])];
+			document.getElementById('sgFailBtns').innerHTML = opts.map(([k, l]) => `<button class="lab-btn ${sg.fail === k ? 'active' : ''}" onclick="setSagaFail('${k}')">${l}</button>`).join('');
+		}
+		function sgRenderSteps(st) {
+			document.getElementById('sgSteps').innerHTML = sgSeq().map((k, i) => `<div class="saga-step ${st[k] || ''}"><b>${i + 1}. ${SG_STEPS[k].name}</b><span class="st">${st[k] === 'ok' ? '✓ ' + SG_STEPS[k].act : st[k] === 'run' ? 'ejecutando…' : st[k] === 'fail' ? '✗ falló' : st[k] === 'comp' ? '↩ compensado: ' + SG_STEPS[k].comp : SG_STEPS[k].act}</span></div>`).join('');
+		}
+		function runSaga() {
+			sg.timers.forEach(clearTimeout); sg.timers = [];
+			const seq = sgSeq(), st = {}, log = document.getElementById('sgLog');
+			log.innerHTML = '';
+			const L = l => { log.innerHTML += l + '<br>'; };
+			let t = 0; const at = (fn) => { sg.timers.push(setTimeout(fn, t)); t += 900; };
+			const done = [];
+			let failed = false;
+			seq.forEach(k => {
+				at(() => { if (failed) return; st[k] = 'run'; sgRenderSteps(st); });
+				at(() => {
+					if (failed) return;
+					if (sg.fail === k) { st[k] = 'fail'; failed = true; L(`<span class="err">✗ ${SG_STEPS[k].name}: falló. Empieza la compensación en reversa.</span>`); sgRenderSteps(st); runComp(); }
+					else { st[k] = 'ok'; done.push(k); L(`<span class="ok">✓ ${SG_STEPS[k].name}: ${SG_STEPS[k].act} (transacción local)</span>`); sgRenderSteps(st); }
+				});
+			});
+			function runComp() {
+				let tt = 700;
+				done.slice().reverse().forEach(k => { sg.timers.push(setTimeout(() => { st[k] = 'comp'; L(`<span class="warn">↩ Compensar ${SG_STEPS[k].name}: ${SG_STEPS[k].comp}</span>`); sgRenderSteps(st); }, tt)); tt += 900; });
+				sg.timers.push(setTimeout(() => {
+					const charged = done.includes('cobro');
+					L(done.length ? `<span class="dim">Estado final: viaje FALLIDO, consistente. ${charged ? 'El cliente vio un cargo y un reembolso.' : 'El cliente nunca vio un cargo.'} Compensaciones ejecutadas: ${done.length}.</span>` : '<span class="dim">Falló el primer paso: no había nada que compensar.</span>');
+				}, tt));
+			}
+			sg.timers.push(setTimeout(() => { if (!failed) L('<span class="ok">🎉 Saga completa: viaje confirmado.</span>'); }, t + 100));
+		}
+
+		// =================================================================
+		// LAB 6.3B: OUTBOX
+		// =================================================================
+		let obOn = false, obTimers = [];
+		function setOb(on) { obOn = on; document.getElementById('obBtnDual').classList.toggle('active', !on); document.getElementById('obBtnOut').classList.toggle('active', on); obDraw({ order: false, outbox: false, kafka: false, dead: false, anim: '' }); document.getElementById('obLog').innerHTML = ''; document.getElementById('obBanner').textContent = on ? 'OUTBOX: dato + evento en la misma transacción' : 'DOBLE ESCRITURA: primero BD, luego Kafka'; document.getElementById('obPill').textContent = '—'; }
+		function obDraw(s) {
+			document.getElementById('obSvg').innerHTML = `<svg viewBox="0 0 760 190" width="100%" style="max-width:740px; display:block; margin:0 auto;">
+				${BOX(20, 65, 120, 60, s.dead ? 'd' : 'p')}${T(80, 92, 'API Órdenes', { w: 700, s: 10.5 })}${T(80, 110, s.dead ? '💥 muerta' : 'productor', { mono: true, s: 9, c: s.dead ? 'var(--accent-danger)' : 'var(--accent-primary)' })}
+				${BOX(220, 20, 200, 150, 'w')}${T(320, 42, 'PostgreSQL', { w: 700, s: 11 })}
+				<rect x="236" y="56" width="168" height="40" rx="6" fill="var(--bg-surface)" stroke="var(--border-strong)"/>${T(320, 80, s.order ? 'orders: #101 ✓' : 'orders: —', { mono: true, s: 10, w: 700, c: s.order ? 'var(--accent-pro)' : 'var(--text-muted)' })}
+				${obOn ? `<rect x="236" y="108" width="168" height="40" rx="6" fill="var(--bg-surface)" stroke="var(--accent-memory)"/>${T(320, 132, s.outbox === 'sent' ? 'outbox: #101 enviado ✓' : s.outbox ? 'outbox: #101 pendiente' : 'outbox: —', { mono: true, s: 9.5, w: 700, c: s.outbox ? 'var(--accent-memory)' : 'var(--text-muted)' })}` : ''}
+				${obOn ? BOX(450, 110, 110, 44, 'm') + T(505, 130, 'Relay / CDC', { w: 700, s: 9.5 }) + T(505, 144, 'lee el WAL', { s: 8.5, c: 'var(--text-muted)' }) : ''}
+				${BOX(600, 40, 140, 60, s.kafka ? 'g' : 'n')}${T(670, 66, 'Kafka', { w: 700, s: 11 })}${T(670, 84, s.kafka ? 'OrderCreated #101 ✓' : 'nada', { mono: true, s: 9, c: s.kafka ? 'var(--accent-pro)' : 'var(--text-muted)' })}
+				${BOX(600, 125, 140, 50, s.kafka ? 'g' : 'n')}${T(670, 147, 'Pagos, Envíos…', { w: 700, s: 9.5 })}${T(670, 162, s.kafka ? 'reaccionan ✓' : 'nunca se enteran', { s: 8.5, c: s.kafka ? 'var(--accent-pro)' : 'var(--accent-danger)' })}
+				${s.anim}</svg>`;
+		}
+		function runOb(crash) {
+			obTimers.forEach(clearTimeout); obTimers = [];
+			const log = document.getElementById('obLog'); log.innerHTML = '';
+			const L = l => log.innerHTML += l + '<br>';
+			const s = { order: false, outbox: false, kafka: false, dead: false, anim: '' };
+			const at = (ms, fn) => obTimers.push(setTimeout(() => { fn(); obDraw(s); }, ms));
+			const pill = document.getElementById('obPill');
+			at(0, () => { s.anim = MOVE('M 140 95 L 236 76', 'var(--accent-primary)', 0.6, 0); L(obOn ? 'BEGIN; INSERT orders #101; INSERT outbox #101; COMMIT ✓' : 'INSERT orders #101; COMMIT ✓'); s.order = true; if (obOn) s.outbox = true; });
+			if (!obOn) {
+				if (crash) { at(1100, () => { s.dead = true; s.anim = ''; L('<span class="err">💥 La API muere antes de publicar en Kafka.</span>'); }); at(2200, () => { L('<span class="err">✗ La orden existe, pero ningún servicio se enteró: no se cobra, no se envía. Inconsistencia silenciosa.</span>'); pill.textContent = 'Inconsistente ✗'; pill.style.color = 'var(--accent-danger)'; }); }
+				else { at(1100, () => { s.anim = MOVE('M 140 95 L 600 70', 'var(--accent-primary)', 0.8, 0); L('publish OrderCreated → Kafka ✓'); }); at(2000, () => { s.kafka = true; s.anim = ''; L('<span class="ok">✓ Esta vez salió bien… porque nada falló entre los dos pasos.</span>'); pill.textContent = 'OK (por suerte)'; pill.style.color = 'var(--accent-warn)'; }); }
+			} else {
+				if (crash) at(1100, () => { s.dead = true; s.anim = ''; L('<span class="err">💥 La API muere. Pero el evento ya está guardado en la tabla outbox.</span>'); });
+				at(crash ? 2200 : 1100, () => { s.anim = MOVE('M 404 128 L 450 132', 'var(--accent-memory)', 0.5, 0) + MOVE('M 560 132 L 600 70', 'var(--accent-memory)', 0.6, 0.6); L('Relay/CDC lee el outbox (o el WAL) y publica OrderCreated #101 en Kafka'); });
+				at(crash ? 3400 : 2300, () => { s.kafka = true; s.outbox = 'sent'; s.anim = ''; L(`<span class="ok">✓ Evento entregado${crash ? ' aunque la API murió' : ''}. Dato y evento siempre juntos.</span>`); pill.textContent = 'Consistente ✓'; pill.style.color = 'var(--accent-pro)'; });
+			}
+		}
+
+		// =================================================================
+		// LAB 6.3C: CQRS
+		// =================================================================
+		let cq3 = { write: 'pagado', read: 'pagado', anim: '', timers: [] };
+		function cqrsDraw() {
+			const stale = cq3.write !== cq3.read;
+			document.getElementById('cqrsSvg').innerHTML = `<svg viewBox="0 0 760 180" width="100%" style="max-width:740px; display:block; margin:0 auto;">
+				${T(190, 18, 'LADO DE ESCRITURA (Command)', { w: 700, s: 10.5, c: 'var(--accent-warn)' })}${T(570, 18, 'LADO DE LECTURA (Query)', { w: 700, s: 10.5, c: 'var(--accent-pro)' })}
+				${BOX(80, 40, 220, 70, 'w')}${T(190, 64, 'PostgreSQL (normalizado)', { w: 700, s: 10 })}${T(190, 90, 'pedido 101: ' + cq3.write, { mono: true, s: 11, w: 700 })}
+				${BOX(460, 40, 220, 70, stale ? 'd' : 'g')}${T(570, 64, 'Elasticsearch (vista)', { w: 700, s: 10 })}${T(570, 90, 'pedido 101: ' + cq3.read, { mono: true, s: 11, w: 700, c: stale ? 'var(--accent-danger)' : 'var(--accent-pro)' })}
+				<line x1="300" y1="75" x2="460" y2="75" stroke="var(--border-strong)" stroke-dasharray="4 4"/>${T(380, 66, 'evento → proyector', { mono: true, s: 9, c: 'var(--text-muted)' })}
+				${T(380, 150, stale ? 'La vista todavía no se entera (lag de proyección)' : 'Vista al día', { s: 10, w: 700, c: stale ? 'var(--accent-danger)' : 'var(--accent-pro)' })}
+				${cq3.anim}</svg>`;
+		}
+		function cqrsLog(l) { const el = document.getElementById('cqrsLog'); el.innerHTML = l + '<br>' + el.innerHTML; }
+		function cqrsWrite() {
+			cq3.timers.forEach(clearTimeout); cq3.timers = [];
+			const lag = +document.getElementById('cqLag').value;
+			cq3.write = cq3.write === 'enviado' ? 'pagado' : 'enviado';
+			const nv = cq3.write;
+			cq3.anim = MOVE('M 300 75 L 460 75', 'var(--accent-memory)', lag, 0, 6);
+			cqrsLog(`✎ Comando: pedido 101 → "${nv}" (confirmado en PostgreSQL). Proyectando… (${lag.toFixed(1)} s)`);
+			cqrsDraw();
+			cq3.timers.push(setTimeout(() => { cq3.read = nv; cq3.anim = ''; cqrsDraw(); cqrsLog(`<span class="ok">✓ La vista ya dice "${nv}".</span>`); }, lag * 1000));
+		}
+		function cqrsRead() {
+			const found = cq3.read === 'enviado';
+			cqrsLog(cq3.write !== cq3.read ? `<span class="warn">🔎 Búsqueda "enviados" → ${found ? 'aparece' : 'NO aparece'} el pedido 101 (la vista va atrasada; PostgreSQL ya dice "${cq3.write}")</span>` : `<span class="ok">🔎 Búsqueda "enviados" → ${found ? 'aparece' : 'no aparece'} el pedido 101 (consistente con la escritura)</span>`);
+		}
+
+		// Inicializar todos los laboratorios
+		window.addEventListener('DOMContentLoaded', () => {
+			if (window.innerWidth <= 1024) toggleSidebar();
+			try { const t = localStorage.getItem('sd-theme'); if (t) setTheme(t); } catch (e) {}
+			recalcSync();
+			qsInit();
+			setDg('amo');
+			kfReset();
+			setSagaOrder('std');
+			setOb(false);
+			cqrsDraw();
+		});
+	</script>
+</body>
+</html>
